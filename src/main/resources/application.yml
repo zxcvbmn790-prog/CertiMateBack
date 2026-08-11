@@ -7,13 +7,21 @@ spring:
 server:
   port: 8080
 
+jwt:
+  secret: ${JWT_SECRET:YourSuperSecretKeyForCertiMateProject2026!}
+  expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+
+kakao:
+  client-id: ${KAKAO_CLIENT_ID:}
+  redirect-uri: ${KAKAO_REDIRECT_URI:}
+
 ---
 spring:
   config:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:mysql://localhost:3306/certimate_manager?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:3306/certimate_manager?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&createDatabaseIfNotExist=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver

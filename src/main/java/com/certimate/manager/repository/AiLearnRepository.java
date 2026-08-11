@@ -1,0 +1,20 @@
+package com.certimate.manager.repository;
+
+import com.certimate.manager.domain.entity.AiLearn;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+
+public interface AiLearnRepository extends JpaRepository<AiLearn, Long> {
+    List<AiLearn> findByCertIdAndSubjectNum(Long certId, Integer subjectNum);
+
+    // MySQL의 RAND() 함수를 사용하여 랜덤 출제
+    @Query(value = "SELECT * FROM AI_LEARN WHERE cert_id = :certId AND subject_num = :subjectNum ORDER BY RAND() LIMIT :limit", nativeQuery = true)
+    List<AiLearn> findRandomQuestionsBySubject(
+            @Param("certId") Long certId,
+            @Param("subjectNum") Integer subjectNum,
+            @Param("limit") int limit
+    );
+}
