@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/community")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://3.39.237.132:3306")
+@CrossOrigin(origins = "http://localhost:3300")
 public class comty {
 
     private final CommunityPostService communityPostService;
