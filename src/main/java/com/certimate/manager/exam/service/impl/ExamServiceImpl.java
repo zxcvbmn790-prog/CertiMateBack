@@ -48,6 +48,19 @@ public class ExamServiceImpl implements ExamService {
     }
 
     @Override
+    public AiLearnResponse getPracticeQuestion(Long certId, List<Long> excludeIds) {
+        List<AiLearn> result = (excludeIds == null || excludeIds.isEmpty())
+                ? aiLearnRepository.findRandomQuestion(certId)
+                : aiLearnRepository.findRandomQuestionExcluding(certId, excludeIds);
+
+        // 제외 대상이 너무 많아 더 뽑을 문제가 없으면 제외 없이 다시 랜덤 출제한다
+        if (result.isEmpty() && excludeIds != null && !excludeIds.isEmpty()) {
+            result = aiLearnRepository.findRandomQuestion(certId);
+        }
+        return result.isEmpty() ? null : AiLearnResponse.from(result.get(0));
+    }
+
+    @Override
     @Transactional
     public void saveQuizHistory(String email, List<QuizHistoryItemRequest> items) {
         com.certimate.manager.auth.entity.User user = userRepository.findByEmail(email)

@@ -7,6 +7,7 @@ import com.certimate.manager.exam.service.ExamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -20,6 +21,23 @@ public class ExamController {
     @GetMapping("/{certId}/mock")
     public ApiResponse<List<AiLearnResponse>> getMockExam(@PathVariable Long certId) {
         return ApiResponse.success(examService.generateMockExam(certId));
+    }
+
+    // 한 문제씩 풀기(무한 학습) 모드: 랜덤 1문제 출제
+    // excludeIds: 직전에 풀었던 learnId들을 쉼표로 구분해 넘기면 연속 중복 출제를 피한다
+    @GetMapping("/{certId}/practice")
+    public ApiResponse<AiLearnResponse> getPracticeQuestion(
+            @PathVariable Long certId,
+            @RequestParam(required = false) String excludeIds) {
+        List<Long> excluded = (excludeIds == null || excludeIds.isBlank())
+                ? List.of()
+                : Arrays.stream(excludeIds.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .map(Long::valueOf)
+                        .toList();
+
+        return ApiResponse.success(examService.getPracticeQuestion(certId, excluded));
     }
 
     // 모의고사 결과 저장 (오답노트용)
