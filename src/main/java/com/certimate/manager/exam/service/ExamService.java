@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface ExamService {
     List<AiLearnResponse> generateMockExam(Long certId);
-    void saveQuizHistory(Long userId, List<QuizHistoryItemRequest> items);
+    void saveQuizHistory(String email, List<QuizHistoryItemRequest> items);
 }

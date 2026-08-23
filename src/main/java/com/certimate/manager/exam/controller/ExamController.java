@@ -23,20 +23,22 @@ public class ExamController {
     }
 
     // 모의고사 결과 저장 (오답노트용)
-    // 실제 서비스에서는 인증된 사용자 ID를 사용해야 하지만, old 프로젝트와 동일하게
-    // 로그인 연동 전까지는 임시로 userId 1을 고정값으로 사용한다.
     @PostMapping("/save-history")
-    public ApiResponse<String> saveHistory(@RequestBody List<QuizHistoryItemRequest> historyPayload) {
-        Long currentUserId = 1L;
-        examService.saveQuizHistory(currentUserId, historyPayload);
+    public ApiResponse<String> saveHistory(@RequestBody List<QuizHistoryItemRequest> historyPayload, java.security.Principal principal) {
+        if (principal == null) {
+            throw new com.certimate.manager.exception.CustomException(org.springframework.http.HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+        }
+        examService.saveQuizHistory(principal.getName(), historyPayload);
         return ApiResponse.success("오답노트가 성공적으로 저장되었습니다.");
     }
 
     // old MockExamController에도 있던 동일 기능의 저장 엔드포인트 (호환성을 위해 유지)
     @PostMapping("/history")
-    public ApiResponse<String> saveExamHistory(@RequestBody List<QuizHistoryItemRequest> historyList) {
-        Long userId = 1L;
-        examService.saveQuizHistory(userId, historyList);
+    public ApiResponse<String> saveExamHistory(@RequestBody List<QuizHistoryItemRequest> historyList, java.security.Principal principal) {
+        if (principal == null) {
+            throw new com.certimate.manager.exception.CustomException(org.springframework.http.HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+        }
+        examService.saveQuizHistory(principal.getName(), historyList);
         return ApiResponse.success("오답노트 저장 완료");
     }
 }

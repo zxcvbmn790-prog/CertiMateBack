@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface ExamScheduleRepository extends JpaRepository<ExamSchedule, Long> {
     List<ExamSchedule> findByCertification_IdAndExamDateAfterOrderByExamDateAsc(Long certId, LocalDate date);
+    List<ExamSchedule> findByUser_IdAndCertification_IdAndExamDateAfterOrderByExamDateAsc(Long userId, Long certId, LocalDate date);
 }

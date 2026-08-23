@@ -15,11 +15,18 @@ public class ExamSchedule {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private com.certimate.manager.auth.entity.User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cert_id", nullable = false)
     private Certification certification;
 
     @Column(name = "exam_type", nullable = false)
     private String examType;
+    
+    @Column(name = "target_read_count", columnDefinition = "int default 1")
+    private Integer targetReadCount;
 
     @Column(name = "registration_start")
     private LocalDate registrationStart;

@@ -34,4 +34,13 @@ public class UserLearnLog {
     @UpdateTimestamp
     @Column(name = "last_studied_at")
     private LocalDateTime lastStudiedAt;
+
+    public void updateStats(int addTimeMin, float newCorrectRate) {
+        this.studyTimeMin = (this.studyTimeMin == null ? 0 : this.studyTimeMin) + addTimeMin;
+        if (this.correctRate == null || this.correctRate == 0.0f) {
+            this.correctRate = newCorrectRate;
+        } else {
+            this.correctRate = (this.correctRate + newCorrectRate) / 2.0f;
+        }
+    }
 }

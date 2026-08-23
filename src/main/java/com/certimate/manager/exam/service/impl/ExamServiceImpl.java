@@ -23,6 +23,9 @@ public class ExamServiceImpl implements ExamService {
 
     private final AiLearnRepository aiLearnRepository;
     private final UserQuizHistoryRepository userQuizHistoryRepository;
+    private final com.certimate.manager.auth.repository.UserRepository userRepository;
+    private final com.certimate.manager.user.repository.UserLearnLogRepository userLearnLogRepository;
+    private final com.certimate.manager.user.repository.CertificationRepository certificationRepository;
 
     @Override
     public List<AiLearnResponse> generateMockExam(Long certId) {
@@ -46,7 +49,11 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     @Transactional
-    public void saveQuizHistory(Long userId, List<QuizHistoryItemRequest> items) {
+    public void saveQuizHistory(String email, List<QuizHistoryItemRequest> items) {
+        com.certimate.manager.auth.entity.User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new com.certimate.manager.exception.CustomException(org.springframework.http.HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        Long userId = user.getId();
+
         List<UserQuizHistory> histories = items.stream()
                 .map(item -> UserQuizHistory.builder()
                         .userId(userId) // 핵심: DB 필수값이므로 반드시 세팅
@@ -58,5 +65,37 @@ public class ExamServiceImpl implements ExamService {
 
         // 여러 건의 데이터를 한 번에 저장 (배치 인서트 효과)
         userQuizHistoryRepository.saveAll(histories);
+        System.out.println("DEBUG: userQuizHistory saved, items size=" + items.size());
+
+        if (!items.isEmpty()) {
+            System.out.println("DEBUG: first learnId=" + items.get(0).learnId());
+            AiLearn learn = aiLearnRepository.findById(items.get(0).learnId()).orElse(null);
+            System.out.println("DEBUG: AiLearn found=" + (learn != null));
+            if (learn != null) {
+                Long certId = learn.getCertId();
+                System.out.println("DEBUG: certId=" + certId);
+                com.certimate.manager.user.entity.Certification cert = certificationRepository.findById(certId).orElse(null);
+                System.out.println("DEBUG: Certification found=" + (cert != null));
+                if (cert != null) {
+                    long correctCount = items.stream().filter(QuizHistoryItemRequest::isCorrect).count();
+                    float currentCorrectRate = (float) correctCount / items.size() * 100.0f;
+                    int assumedStudyMin = 30; // 프론트에서 넘어오지 않으므로 임의 30분 산정
+                    System.out.println("DEBUG: calculating stats, correctRate=" + currentCorrectRate);
+
+                    com.certimate.manager.user.entity.UserLearnLog log = userLearnLogRepository
+                            .findByUser_IdAndCertification_Id(userId, certId)
+                            .orElse(com.certimate.manager.user.entity.UserLearnLog.builder()
+                                    .user(user)
+                                    .certification(cert)
+                                    .studyTimeMin(0)
+                                    .correctRate(0.0f)
+                                    .build());
+
+                    log.updateStats(assumedStudyMin, currentCorrectRate);
+                    userLearnLogRepository.save(log);
+                    System.out.println("DEBUG: userLearnLog saved");
+                }
+            }
+        }
     }
 }
