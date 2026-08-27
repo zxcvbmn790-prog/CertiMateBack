@@ -3,6 +3,7 @@ package com.certimate.manager.exam.controller;
 import com.certimate.manager.common.ApiResponse;
 import com.certimate.manager.exam.dto.QuizHistoryItemRequest;
 import com.certimate.manager.exam.dto.AiLearnResponse;
+import com.certimate.manager.exam.dto.CertSummaryResponse;
 import com.certimate.manager.exam.service.ExamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,12 @@ import java.util.List;
 public class ExamController {
 
     private final ExamService examService;
+
+    // CBT 종목 목록 (실제 문제가 등록된 자격증만, 과목별 문항수 포함)
+    @GetMapping("/certs")
+    public ApiResponse<List<CertSummaryResponse>> listCerts() {
+        return ApiResponse.success(examService.listCertifications());
+    }
 
     // CBT 모의고사 출제
     @GetMapping("/{certId}/mock")

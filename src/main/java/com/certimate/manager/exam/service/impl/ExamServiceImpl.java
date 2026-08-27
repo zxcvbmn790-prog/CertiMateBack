@@ -4,9 +4,11 @@ import com.certimate.manager.exam.entity.AiLearn;
 import com.certimate.manager.exam.entity.UserQuizHistory;
 import com.certimate.manager.exam.dto.QuizHistoryItemRequest;
 import com.certimate.manager.exam.dto.AiLearnResponse;
+import com.certimate.manager.exam.dto.CertSummaryResponse;
 import com.certimate.manager.exam.repository.AiLearnRepository;
 import com.certimate.manager.exam.repository.UserQuizHistoryRepository;
 import com.certimate.manager.exam.service.ExamService;
+import com.certimate.manager.user.repository.CertificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,14 @@ public class ExamServiceImpl implements ExamService {
 
     private final AiLearnRepository aiLearnRepository;
     private final UserQuizHistoryRepository userQuizHistoryRepository;
+    private final CertificationRepository certificationRepository;
+
+    @Override
+    public List<CertSummaryResponse> listCertifications() {
+        return certificationRepository.findCertificationsWithQuestions().stream()
+                .map(CertSummaryResponse::from)
+                .collect(Collectors.toList());
+    }
 
     @Override
     public List<AiLearnResponse> generateMockExam(Long certId) {
