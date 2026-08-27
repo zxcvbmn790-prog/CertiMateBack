@@ -9,6 +9,7 @@ public interface AuthService {
     void register(RegisterRequest request);
     String login(LoginRequest request);
     String kakaoLogin(String code);
+    String googleLogin(String code);
     UserInfoResponse getMe(String email);
     void updateProfile(String email, UpdateProfileRequest request);
     void withdraw(String email);
