@@ -31,4 +31,9 @@ public class AiLearn {
 
     @Column(columnDefinition = "TEXT")
     private String explanation;
+
+    // AI가 생성한 해설을 채워 넣는다 (최초 1회 생성 후 DB에 영구 저장)
+    public void applyExplanation(String generated) {
+        this.explanation = generated;
+    }
 }

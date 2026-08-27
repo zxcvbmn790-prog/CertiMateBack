@@ -5,8 +5,10 @@ import com.certimate.manager.exam.entity.UserQuizHistory;
 import com.certimate.manager.exam.dto.QuizHistoryItemRequest;
 import com.certimate.manager.exam.dto.AiLearnResponse;
 import com.certimate.manager.exam.dto.CertSummaryResponse;
+import com.certimate.manager.exam.dto.ExplanationResponse;
 import com.certimate.manager.exam.repository.AiLearnRepository;
 import com.certimate.manager.exam.repository.UserQuizHistoryRepository;
+import com.certimate.manager.exam.service.AiExplanationService;
 import com.certimate.manager.exam.service.ExamService;
 import com.certimate.manager.user.repository.CertificationRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class ExamServiceImpl implements ExamService {
     private final AiLearnRepository aiLearnRepository;
     private final UserQuizHistoryRepository userQuizHistoryRepository;
     private final CertificationRepository certificationRepository;
+    private final AiExplanationService aiExplanationService;
 
     @Override
     public List<CertSummaryResponse> listCertifications() {
@@ -68,5 +71,32 @@ public class ExamServiceImpl implements ExamService {
 
         // 여러 건의 데이터를 한 번에 저장 (배치 인서트 효과)
         userQuizHistoryRepository.saveAll(histories);
+    }
+
+    // 채점 시 해설이 비어있는 문제들에 대해 AI 해설을 일괄 생성하고 DB에 저장한다.
+    // 이미 해설이 있으면 건너뛰므로 한 문제당 생성은 평생 최대 1회.
+    // ponytail: 문제별 순차 호출. 한 번에 다수 결측이면 느릴 수 있음 — 필요 시 프롬프트 배치로 묶을 것.
+    @Override
+    @Transactional
+    public List<ExplanationResponse> generateExplanations(List<Long> learnIds) {
+        List<ExplanationResponse> results = new ArrayList<>();
+        if (learnIds == null || learnIds.isEmpty()) return results;
+
+        for (Long learnId : learnIds) {
+            AiLearn q = aiLearnRepository.findById(learnId).orElse(null);
+            if (q == null) continue;
+
+            // 이미 해설이 있으면 그대로 반환 (재생성/재과금 방지)
+            if (q.getExplanation() != null && !q.getExplanation().isBlank()) {
+                results.add(new ExplanationResponse(learnId, q.getExplanation()));
+                continue;
+            }
+
+            String generated = aiExplanationService.generate(q);
+            q.applyExplanation(generated);
+            aiLearnRepository.save(q);
+            results.add(new ExplanationResponse(learnId, generated));
+        }
+        return results;
     }
 }

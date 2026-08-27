@@ -4,6 +4,7 @@ import com.certimate.manager.common.ApiResponse;
 import com.certimate.manager.exam.dto.QuizHistoryItemRequest;
 import com.certimate.manager.exam.dto.AiLearnResponse;
 import com.certimate.manager.exam.dto.CertSummaryResponse;
+import com.certimate.manager.exam.dto.ExplanationResponse;
 import com.certimate.manager.exam.service.ExamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +28,12 @@ public class ExamController {
     @GetMapping("/{certId}/mock")
     public ApiResponse<List<AiLearnResponse>> getMockExam(@PathVariable Long certId) {
         return ApiResponse.success(examService.generateMockExam(certId));
+    }
+
+    // 채점 시 해설이 없는 문제들의 AI 해설을 일괄 생성 (learnId 배열을 받는다)
+    @PostMapping("/explanations")
+    public ApiResponse<List<ExplanationResponse>> generateExplanations(@RequestBody List<Long> learnIds) {
+        return ApiResponse.success(examService.generateExplanations(learnIds));
     }
 
     // 모의고사 결과 저장 (오답노트용)
