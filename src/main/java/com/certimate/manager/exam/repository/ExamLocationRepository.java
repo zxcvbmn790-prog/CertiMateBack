@@ -11,7 +11,7 @@ public interface ExamLocationRepository extends JpaRepository<ExamLocation, Long
 
     // 이름/주소 부분검색 (최대 50건)
     @Query(value = """
-            SELECT * FROM exam_location
+            SELECT * FROM qnet_exam_info
             WHERE test_site LIKE CONCAT('%', :q, '%') OR address LIKE CONCAT('%', :q, '%')
             LIMIT 50
             """, nativeQuery = true)
@@ -19,7 +19,7 @@ public interface ExamLocationRepository extends JpaRepository<ExamLocation, Long
 
     // 내 주변: Haversine 거리(km) 계산 후 가까운 순 정렬. 좌표 없는 행은 제외.
     @Query(value = """
-            SELECT id, test_site AS testSite, address, latitude, longitude,
+            SELECT id, qual_name AS qualName, exam_round AS examRound, exam_date AS examDate, test_site AS testSite, address, latitude, longitude,
                    (6371 * ACOS(
                        LEAST(1.0,
                          COS(RADIANS(:lat)) * COS(RADIANS(CAST(latitude AS DECIMAL(12,8)))) *
@@ -27,7 +27,7 @@ public interface ExamLocationRepository extends JpaRepository<ExamLocation, Long
                          SIN(RADIANS(:lat)) * SIN(RADIANS(CAST(latitude AS DECIMAL(12,8))))
                        )
                    )) AS distanceKm
-            FROM exam_location
+            FROM qnet_exam_info
             WHERE latitude IS NOT NULL AND latitude <> '' AND longitude IS NOT NULL AND longitude <> ''
             ORDER BY distanceKm ASC
             LIMIT :limit
@@ -36,6 +36,9 @@ public interface ExamLocationRepository extends JpaRepository<ExamLocation, Long
 
     interface NearProjection {
         Long getId();
+        String getQualName();
+        String getExamRound();
+        String getExamDate();
         String getTestSite();
         String getAddress();
         String getLatitude();

@@ -27,7 +27,7 @@ public class ExamLocationService {
         int n = Math.max(1, Math.min(limit, 50)); // 1~50 제한
         return examLocationRepository.findNearest(lat, lng, n).stream()
                 .map(p -> new ExamLocationResponse(
-                        p.getId(), p.getTestSite(), p.getAddress(),
+                        p.getId(), p.getQualName(), p.getExamRound(), p.getExamDate(), p.getTestSite(), p.getAddress(),
                         p.getLatitude(), p.getLongitude(),
                         p.getDistanceKm() == null ? null : Math.round(p.getDistanceKm() * 10.0) / 10.0))
                 .collect(Collectors.toList());
