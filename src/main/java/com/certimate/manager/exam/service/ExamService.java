@@ -12,4 +12,5 @@ public interface ExamService {
     List<AiLearnResponse> generateMockExam(Long certId);
     void saveQuizHistory(Long userId, List<QuizHistoryItemRequest> items);
     List<ExplanationResponse> generateExplanations(List<Long> learnIds);
+    void reportExplanation(Long learnId);
 }

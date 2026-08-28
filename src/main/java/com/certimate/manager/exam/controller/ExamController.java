@@ -30,10 +30,17 @@ public class ExamController {
         return ApiResponse.success(examService.generateMockExam(certId));
     }
 
-    // 채점 시 해설이 없는 문제들의 AI 해설을 일괄 생성 (learnId 배열을 받는다)
+    // 해설이 없는 문제의 AI 해설 생성 (learnId 배열 — 온디맨드는 단건 배열로 호출)
     @PostMapping("/explanations")
     public ApiResponse<List<ExplanationResponse>> generateExplanations(@RequestBody List<Long> learnIds) {
         return ApiResponse.success(examService.generateExplanations(learnIds));
+    }
+
+    // AI 해설 신고 → 즉시 숨김(제거), 다음에 다시 요청하면 재생성
+    @PostMapping("/{learnId}/report-explanation")
+    public ApiResponse<String> reportExplanation(@PathVariable Long learnId) {
+        examService.reportExplanation(learnId);
+        return ApiResponse.success("신고가 접수되어 해당 해설을 숨겼습니다.");
     }
 
     // 모의고사 결과 저장 (오답노트용)

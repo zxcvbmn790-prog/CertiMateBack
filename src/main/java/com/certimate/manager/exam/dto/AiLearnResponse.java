@@ -10,7 +10,8 @@ public record AiLearnResponse(
         String question,
         String options,
         String answer,
-        String explanation
+        String explanation,
+        boolean explanationAi
 ) {
     public static AiLearnResponse from(AiLearn aiLearn) {
         return new AiLearnResponse(
@@ -20,7 +21,8 @@ public record AiLearnResponse(
                 aiLearn.getQuestion(),
                 aiLearn.getOptions(),
                 aiLearn.getAnswer(),
-                aiLearn.getExplanation()
+                aiLearn.getExplanation(),
+                aiLearn.isExplanationAi()
         );
     }
 }

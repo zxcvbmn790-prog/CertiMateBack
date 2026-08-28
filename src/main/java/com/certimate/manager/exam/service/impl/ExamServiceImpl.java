@@ -88,15 +88,26 @@ public class ExamServiceImpl implements ExamService {
 
             // 이미 해설이 있으면 그대로 반환 (재생성/재과금 방지)
             if (q.getExplanation() != null && !q.getExplanation().isBlank()) {
-                results.add(new ExplanationResponse(learnId, q.getExplanation()));
+                results.add(new ExplanationResponse(learnId, q.getExplanation(), q.isExplanationAi()));
                 continue;
             }
 
             String generated = aiExplanationService.generate(q);
             q.applyExplanation(generated);
             aiLearnRepository.save(q);
-            results.add(new ExplanationResponse(learnId, generated));
+            results.add(new ExplanationResponse(learnId, generated, true));
         }
         return results;
+    }
+
+    // AI 해설 신고: 해설을 제거해 즉시 숨기고, 다음에 다시 요청하면 재생성되게 한다.
+    // 사람이 작성한 해설(explanationAi=false)은 신고 대상이 아니므로 건드리지 않는다.
+    @Override
+    @Transactional
+    public void reportExplanation(Long learnId) {
+        AiLearn q = aiLearnRepository.findById(learnId).orElse(null);
+        if (q == null || !q.isExplanationAi()) return;
+        q.clearExplanation();
+        aiLearnRepository.save(q);
     }
 }
