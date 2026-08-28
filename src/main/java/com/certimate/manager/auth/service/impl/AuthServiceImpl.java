@@ -47,6 +47,15 @@ public class AuthServiceImpl implements AuthService {
     @Value("${kakao.redirect-uri}")
     private String kakaoRedirectUri;
 
+    @Value("${google.client-id}")
+    private String googleClientId;
+
+    @Value("${google.client-secret}")
+    private String googleClientSecret;
+
+    @Value("${google.redirect-uri}")
+    private String googleRedirectUri;
+
     // ==========================================
     // [1. 일반 이메일 회원가입]
     // ==========================================
@@ -165,6 +174,81 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("카카오 로그인 중 서버 오류가 발생했습니다.");
+        }
+    }
+
+    // ==========================================
+    // [4. 구글 소셜 로그인] — 카카오와 동일한 code→token→userinfo 흐름
+    // ==========================================
+    @Override
+    @Transactional
+    public String googleLogin(String code) {
+        RestTemplate restTemplate = new RestTemplate();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+            // STEP 1: 인가 코드로 구글 액세스 토큰 교환
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
+
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("grant_type", "authorization_code");
+            body.add("client_id", googleClientId);
+            body.add("client_secret", googleClientSecret); // 카카오와 달리 구글은 시크릿 필요
+            body.add("redirect_uri", googleRedirectUri);
+            body.add("code", code);
+
+            HttpEntity<MultiValueMap<String, String>> tokenRequest = new HttpEntity<>(body, headers);
+            ResponseEntity<String> tokenResponse = restTemplate.exchange(
+                    "https://oauth2.googleapis.com/token", HttpMethod.POST, tokenRequest, String.class);
+
+            JsonNode tokenNode = objectMapper.readTree(tokenResponse.getBody());
+            String googleAccessToken = tokenNode.get("access_token").asText();
+
+            // STEP 2: 액세스 토큰으로 구글 유저 정보 요청
+            HttpHeaders infoHeaders = new HttpHeaders();
+            infoHeaders.add("Authorization", "Bearer " + googleAccessToken);
+
+            HttpEntity<MultiValueMap<String, String>> infoRequest = new HttpEntity<>(infoHeaders);
+            ResponseEntity<String> infoResponse = restTemplate.exchange(
+                    "https://www.googleapis.com/oauth2/v3/userinfo", HttpMethod.GET, infoRequest, String.class);
+
+            JsonNode infoNode = objectMapper.readTree(infoResponse.getBody());
+
+            // 방어적 파싱 (sub는 항상 존재, email/name은 방어)
+            String googleId = infoNode.get("sub").asText();
+
+            String email = googleId + "@google.com";
+            if (infoNode.has("email") && !infoNode.get("email").isNull()) {
+                email = infoNode.get("email").asText();
+            }
+
+            String name = "구글유저_" + googleId.substring(0, 4);
+            if (infoNode.has("name") && !infoNode.get("name").isNull()) {
+                name = infoNode.get("name").asText();
+            }
+
+            // STEP 3: DB 조회 후 없으면 자동 가입
+            User user = userRepository.findByEmail(email).orElse(null);
+
+            if (user == null) {
+                user = User.builder()
+                        .email(email)
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .name(name)
+                        .googleId(googleId)
+                        .agreeConsent(true)
+                        .major("미입력")
+                        .build();
+                userRepository.save(user);
+            }
+
+            // STEP 4: 우리 시스템 JWT 발급
+            return jwtProvider.generateToken(user.getEmail());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("구글 로그인 중 서버 오류가 발생했습니다.");
         }
     }
 

@@ -18,6 +18,17 @@ kakao:
   client-id: 3fc4df0a3500e172f4eb5ef1b83f87e5
   redirect-uri: http://localhost:3000/auth/kakao/callback
 
+google:
+  client-id: ${GOOGLE_CLIENT_ID:}
+  client-secret: ${GOOGLE_CLIENT_SECRET:}
+  redirect-uri: ${GOOGLE_REDIRECT_URI:}
+
+# AI 해설 생성 (Google Gemini 무료 티어). 키가 없으면 해설 생성만 실패하고 나머지는 정상.
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  # 무료 티어. 한도가 부족하면 gemini-2.5-flash-lite(RPD 더 넉넉)로 변경 가능.
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
+
 ---
 spring:
   config:

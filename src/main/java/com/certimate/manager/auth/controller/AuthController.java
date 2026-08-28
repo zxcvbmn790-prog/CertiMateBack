@@ -48,6 +48,14 @@ public class AuthController {
         return ApiResponse.success("카카오 로그인에 성공했습니다.");
     }
 
+    // 구글 로그인 API 창구 (카카오와 동일하게 code만 받는다)
+    @PostMapping("/google")
+    public ApiResponse<String> googleLogin(@RequestBody KakaoLoginRequest request, HttpServletResponse response) {
+        String token = authService.googleLogin(request.code());
+        setCookie(response, token);
+        return ApiResponse.success("구글 로그인에 성공했습니다.");
+    }
+
     @GetMapping("/me")
     public ApiResponse<UserInfoResponse> getMe(Principal principal) {
         requireAuth(principal);
