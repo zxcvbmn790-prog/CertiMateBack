@@ -239,6 +239,7 @@ public class UserServiceImpl implements UserService {
         com.certimate.manager.user.entity.ExamSchedule schedule = com.certimate.manager.user.entity.ExamSchedule.builder()
                 .user(user)
                 .certification(cert)
+                .qualName(cert.getCertName())
                 .examType(request.examType())
                 .examDate(request.examDate())
                 .targetReadCount(request.targetReadCount() != null && request.targetReadCount() > 0 ? request.targetReadCount() : 1)
