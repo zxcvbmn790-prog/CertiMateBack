@@ -87,37 +87,24 @@ public class UserServiceImpl implements UserService {
         Map<Long, Long> learnIdToCertId = aiLearns.stream().collect(Collectors.toMap(com.certimate.manager.exam.entity.AiLearn::getLearnId, com.certimate.manager.exam.entity.AiLearn::getCertId));
 
         DashboardResponse.TargetExam targetExam = null;
-        if (!logs.isEmpty()) {
-            logs.sort((a, b) -> {
-                if (a.getLastStudiedAt() == null && b.getLastStudiedAt() == null) return 0;
-                if (a.getLastStudiedAt() == null) return 1;
-                if (b.getLastStudiedAt() == null) return -1;
-                return b.getLastStudiedAt().compareTo(a.getLastStudiedAt());
-            });
-            com.certimate.manager.user.entity.UserLearnLog recentLog = logs.get(0);
-            List<com.certimate.manager.user.entity.ExamSchedule> schedules = examScheduleRepository.findByUser_IdAndCertification_IdAndExamDateAfterOrderByExamDateAsc(
-                    user.getId(), recentLog.getCertification().getId(), LocalDate.now().minusDays(1));
+        List<com.certimate.manager.user.entity.ExamSchedule> allSchedules = examScheduleRepository.findByUser_IdAndExamDateAfterOrderByExamDateAsc(
+                user.getId(), LocalDate.now().minusDays(1));
 
-            if (!schedules.isEmpty()) {
-                ExamSchedule upcoming = schedules.get(0);
-                long dDay = ChronoUnit.DAYS.between(LocalDate.now(), upcoming.getExamDate());
-                
-                long solvedSessions = quizHistory.stream()
-                        .filter(q -> learnIdToCertId.get(q.getLearnId()) != null && learnIdToCertId.get(q.getLearnId()).equals(recentLog.getCertification().getId()) && q.getSolvedAt() != null)
-                        .map(q -> q.getSolvedAt().format(DateTimeFormatter.ISO_LOCAL_DATE))
-                        .distinct()
-                        .count();
-                int target = upcoming.getTargetReadCount() != null && upcoming.getTargetReadCount() > 0 ? upcoming.getTargetReadCount() : 1;
-                float achievement = Math.min(100.0f, ((float) solvedSessions / target) * 100);
+        if (!allSchedules.isEmpty()) {
+            com.certimate.manager.user.entity.ExamSchedule upcoming = allSchedules.get(0);
+            long dDay = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), upcoming.getExamDate());
+            
+            long solvedSessions = quizHistory.stream()
+                    .filter(q -> learnIdToCertId.get(q.getLearnId()) != null && learnIdToCertId.get(q.getLearnId()).equals(upcoming.getCertification().getId()) && q.getSolvedAt() != null)
+                    .map(q -> q.getSolvedAt().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE))
+                    .distinct()
+                    .count();
+            
+            int target = upcoming.getTargetReadCount() != null && upcoming.getTargetReadCount() > 0 ? upcoming.getTargetReadCount() : 1;
+            long rate = (solvedSessions * 100) / target;
+            String rateStr = String.valueOf(Math.min(100, rate));
 
-                targetExam = new DashboardResponse.TargetExam(
-                        recentLog.getCertification().getCertName(),
-                        upcoming.getExamType(),
-                        upcoming.getExamDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
-                        dDay,
-                        String.format("%.0f", achievement)
-                );
-            }
+            targetExam = new DashboardResponse.TargetExam(upcoming.getQualName(), upcoming.getExamType(), upcoming.getExamDate().toString(), dDay, rateStr);
         }
 
         String studyTimeStr = totalStudyMin < 60 ? totalStudyMin + "m" : (totalStudyMin / 60) + "h " + (totalStudyMin % 60) + "m";

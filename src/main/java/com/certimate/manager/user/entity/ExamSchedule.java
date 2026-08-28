@@ -11,8 +11,14 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class ExamSchedule {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "schedule_id")
+    @Column(name = "id")
     private Long id;
+
+    @Column(name = "qual_name")
+    private String qualName;
+
+    @Column(name = "exam_round")
+    private String examRound;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
