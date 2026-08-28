@@ -26,7 +26,8 @@ google:
 # AI 해설 생성 (Anthropic Claude). 키가 없으면 해설 생성만 실패하고 나머지는 정상.
 anthropic:
   api-key: ${ANTHROPIC_API_KEY:}
-  model: ${ANTHROPIC_MODEL:claude-opus-5}
+  # 해설 생성은 단순 작업이라 Haiku로 충분 (비용 약 1/5). 필요 시 ANTHROPIC_MODEL로 상향.
+  model: ${ANTHROPIC_MODEL:claude-haiku-4-5}
 
 ---
 spring:
