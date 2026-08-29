@@ -2,6 +2,7 @@ package com.certimate.manager.exam.controller;
 
 import com.certimate.manager.common.ApiResponse;
 import com.certimate.manager.exam.dto.ExamLocationResponse;
+import com.certimate.manager.exam.dto.GlobalScheduleResponse;
 import com.certimate.manager.exam.service.ExamLocationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -29,5 +30,10 @@ public class ExamLocationController {
             @RequestParam double lng,
             @RequestParam(defaultValue = "10") int limit) {
         return ApiResponse.success(examLocationService.nearest(lat, lng, limit));
+    }
+
+    @GetMapping("/all-schedules")
+    public ApiResponse<List<GlobalScheduleResponse>> allSchedules() {
+        return ApiResponse.success(examLocationService.findAllSchedules());
     }
 }

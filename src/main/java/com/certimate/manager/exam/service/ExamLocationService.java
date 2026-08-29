@@ -1,6 +1,8 @@
 package com.certimate.manager.exam.service;
 
 import com.certimate.manager.exam.dto.ExamLocationResponse;
+import com.certimate.manager.exam.dto.GlobalScheduleResponse;
+
 import com.certimate.manager.exam.repository.ExamLocationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,5 +33,10 @@ public class ExamLocationService {
                         p.getLatitude(), p.getLongitude(),
                         p.getDistanceKm() == null ? null : Math.round(p.getDistanceKm() * 10.0) / 10.0))
                 .collect(Collectors.toList());
+    }
+    public List<GlobalScheduleResponse> findAllSchedules() {
+        return examLocationRepository.findAllSchedules().stream()
+                .map(GlobalScheduleResponse::of)
+                .toList();
     }
 }

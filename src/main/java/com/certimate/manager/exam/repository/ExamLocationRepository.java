@@ -34,6 +34,16 @@ public interface ExamLocationRepository extends JpaRepository<ExamLocation, Long
             """, nativeQuery = true)
     List<NearProjection> findNearest(@Param("lat") double lat, @Param("lng") double lng, @Param("limit") int limit);
 
+    @Query(value = "SELECT DISTINCT qual_name AS qualName, exam_round AS examRound, DATE_FORMAT(exam_date, '%Y-%m-%d') AS examDate, exam_type AS examType FROM exam_schedule WHERE exam_date IS NOT NULL", nativeQuery = true)
+    List<ScheduleProjection> findAllSchedules();
+
+    interface ScheduleProjection {
+        String getQualName();
+        String getExamRound();
+        String getExamDate();
+        String getExamType();
+    }
+
     interface NearProjection {
         Long getId();
         String getQualName();
