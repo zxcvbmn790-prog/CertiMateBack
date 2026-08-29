@@ -153,6 +153,13 @@ public class AuthServiceImpl implements AuthService {
                 email = infoNode.get("kakao_account").get("email").asText();
             }
 
+            // 프로필 이미지 (properties.profile_image)
+            String profileImage = null;
+            if (infoNode.has("properties") && infoNode.get("properties").has("profile_image")
+                    && !infoNode.get("properties").get("profile_image").isNull()) {
+                profileImage = infoNode.get("properties").get("profile_image").asText();
+            }
+
             // STEP 3: 우리 DB에 있는지 확인하고, 없으면 자동 회원가입!
             User user = userRepository.findByEmail(email).orElse(null);
 
@@ -162,9 +169,13 @@ public class AuthServiceImpl implements AuthService {
                         .password(passwordEncoder.encode(UUID.randomUUID().toString())) // 카카오 유저는 비번을 몰라도 됨
                         .name(name)
                         .kakaoId(kakaoId)
+                        .profileImage(profileImage)
                         .agreeConsent(true) // 카카오 가입 시 동의한 것으로 간주
                         .major("미입력")
                         .build();
+                userRepository.save(user);
+            } else {
+                user.applySocialProfileImage(profileImage); // 기존 유저는 이미지 없을 때만 백필
                 userRepository.save(user);
             }
 
@@ -228,6 +239,12 @@ public class AuthServiceImpl implements AuthService {
                 name = infoNode.get("name").asText();
             }
 
+            // 프로필 이미지 (google userinfo의 picture)
+            String profileImage = null;
+            if (infoNode.has("picture") && !infoNode.get("picture").isNull()) {
+                profileImage = infoNode.get("picture").asText();
+            }
+
             // STEP 3: DB 조회 후 없으면 자동 가입
             User user = userRepository.findByEmail(email).orElse(null);
 
@@ -237,9 +254,13 @@ public class AuthServiceImpl implements AuthService {
                         .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                         .name(name)
                         .googleId(googleId)
+                        .profileImage(profileImage)
                         .agreeConsent(true)
                         .major("미입력")
                         .build();
+                userRepository.save(user);
+            } else {
+                user.applySocialProfileImage(profileImage); // 기존 유저는 이미지 없을 때만 백필
                 userRepository.save(user);
             }
 
