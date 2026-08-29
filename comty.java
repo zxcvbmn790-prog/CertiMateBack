@@ -10,6 +10,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartFile;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.List;
 
@@ -20,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/community")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3300")
+@CrossOrigin(origins = "jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul")
 public class comty {
 
     private final CommunityPostService communityPostService;
@@ -34,7 +37,7 @@ public class comty {
             @RequestParam("title") String title,
             @RequestParam("category") String category,
             @RequestParam("content") String content,
-            @RequestParam(value = "nickname", required = false) Integer nickname,
+            @RequestParam(value = "user_id", required = false) Integer nickname,
             @RequestParam(value = "userId", required = false) Long userId,
             @RequestParam(value = "image", required = false) MultipartFile image
     ) {
