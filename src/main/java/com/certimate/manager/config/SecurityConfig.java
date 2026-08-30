@@ -32,7 +32,7 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/exams/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/exams/**", "/api/community/**", "/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 기본 문지기 대신 우리가 만든 JWT 문지기를 앞에 세웁니다.

@@ -35,9 +35,9 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/certimate_manager?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&createDatabaseIfNotExist=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    url: ${DB_URL:jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:certimate}
+    password: ${DB_PASSWORD:CertiMate!2026App}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -56,9 +56,9 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:certimate}
+    password: ${DB_PASSWORD:CertiMate!2026App}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -71,9 +71,9 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:certimate}
+    password: ${DB_PASSWORD:CertiMate!2026App}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
