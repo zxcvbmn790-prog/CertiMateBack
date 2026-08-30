@@ -31,6 +31,5 @@ target/
 
 ### Logs ###
 *.log
-
 env
-
+build/

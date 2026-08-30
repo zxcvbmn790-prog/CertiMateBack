@@ -8,6 +8,12 @@ import com.certimate.manager.exam.dto.ExplanationResponse;
 import com.certimate.manager.exam.service.ExamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import com.certimate.manager.user.repository.ExamScheduleRepository;
+import com.certimate.manager.user.repository.CertificationRepository;
+import com.certimate.manager.user.entity.ExamSchedule;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
+import java.util.Map;
 
 import java.util.List;
 
@@ -17,8 +23,26 @@ import java.util.List;
 public class ExamController {
 
     private final ExamService examService;
+    private final ExamScheduleRepository examScheduleRepository;
+    private final CertificationRepository certificationRepository;
 
     // CBT 종목 목록 (실제 문제가 등록된 자격증만, 과목별 문항수 포함)
+
+    @GetMapping("/{certId}/schedules")
+    public ApiResponse<List<Map<String, Object>>> getGlobalSchedules(@PathVariable Long certId) {
+        String certName = certificationRepository.findById(certId).map(com.certimate.manager.user.entity.Certification::getCertName).orElse("");
+        List<ExamSchedule> schedules = examScheduleRepository.findByQualNameAndUserIsNullAndExamDateAfterOrderByExamDateAsc(certName, LocalDate.now().minusDays(1));
+        List<Map<String, Object>> response = schedules.stream().map(s -> {
+            Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", s.getId());
+            map.put("examDate", s.getExamDate() != null ? s.getExamDate().toString() : "");
+            map.put("examType", s.getExamType() != null ? s.getExamType() : "");
+            map.put("examRound", s.getExamRound() != null ? s.getExamRound() : "");
+            return map;
+        }).collect(Collectors.toList());
+        return ApiResponse.success(response);
+    }
+
     @GetMapping("/certs")
     public ApiResponse<List<CertSummaryResponse>> listCerts() {
         return ApiResponse.success(examService.listCertifications());

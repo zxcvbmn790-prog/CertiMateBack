@@ -59,4 +59,11 @@ public class User {
             this.agreeConsent = agreeConsent;
         }
     }
+
+    // 소셜 로그인 프로필 이미지 백필: 아직 이미지가 없을 때만 채운다(직접 올린 사진은 보존).
+    public void applySocialProfileImage(String url) {
+        if (url != null && !url.isBlank() && (this.profileImage == null || this.profileImage.isBlank())) {
+            this.profileImage = url;
+        }
+    }
 }

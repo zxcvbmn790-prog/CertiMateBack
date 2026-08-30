@@ -31,8 +31,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/exams/**", "/api/community/**", "/uploads/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/exams/**", "/api/community/**", "/api/ai/**", "/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 기본 문지기 대신 우리가 만든 JWT 문지기를 앞에 세웁니다.
@@ -46,7 +45,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true); // React와 쿠키(JWT) 교환 허용
-        config.setAllowedOriginPatterns(List.of("http://localhost:*"));
+        config.setAllowedOriginPatterns(List.of("http://localhost:*", "https://certimate.shop", "https://www.certimate.shop"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         source.registerCorsConfiguration("/**", config);
