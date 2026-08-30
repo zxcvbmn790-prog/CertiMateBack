@@ -1,18 +1,15 @@
-package com.certimate;
+package com.certimate.manager.community.controller;
 
-import com.certimate.dto.CommentsRequestDto;
-import com.certimate.dto.CommentsResponseDto;
-import com.certimate.dto.CommunityPostRequestDto;
-import com.certimate.dto.CommunityPostResponseDto;
-import com.certimate.service.CommunityPostService;
+import com.certimate.manager.community.dto.CommentsRequestDto;
+import com.certimate.manager.community.dto.CommentsResponseDto;
+import com.certimate.manager.community.dto.CommunityPostRequestDto;
+import com.certimate.manager.community.dto.CommunityPostResponseDto;
+import com.certimate.manager.community.service.CommunityPostService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.multipart.MultipartFile;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.util.List;
 
@@ -23,7 +20,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/community")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul")
 public class comty {
 
     private final CommunityPostService communityPostService;
