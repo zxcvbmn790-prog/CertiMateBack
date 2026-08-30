@@ -5,8 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CertificationRepository extends JpaRepository<Certification, Long> {
+
+    Optional<Certification> findByCertName(String certName);
 
     // 실제 문제가 등록된 자격증만 과목별 문항수와 함께 조회 (문제 0개인 자격증은 목록에서 제외)
     @Query(value = """
