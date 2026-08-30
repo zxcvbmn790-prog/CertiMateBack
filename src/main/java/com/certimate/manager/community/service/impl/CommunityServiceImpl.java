@@ -28,7 +28,8 @@ public class CommunityServiceImpl implements CommunityService {
     @Override
     public List<CommunityPostResponse> getMyPosts(String email) {
         User user = getUserOrThrow(email);
-        return communityPostRepository.findByNicknameOrderByCreatedAtDesc(user.getId()).stream()
+        Integer nickname = user.getId() != null ? user.getId().intValue() : null;
+        return communityPostRepository.findByNicknameOrderByCreatedAtDesc(nickname).stream()
                 .map(CommunityPostResponse::from)
                 .collect(Collectors.toList());
     }

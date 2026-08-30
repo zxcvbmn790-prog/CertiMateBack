@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "USER_QUIZ_HISTORY")
+@Table(name = "user_quiz_history")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,7 +30,7 @@ public class UserQuizHistory {
     @Column(name = "is_correct", nullable = false)
     private Boolean isCorrect;
 
-    // DB의 DEFAULT CURRENT_TIMESTAMP를 사용
-    @Column(name = "solved_at", insertable = false, updatable = false)
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "solved_at", updatable = false)
     private LocalDateTime solvedAt;
 }

@@ -31,6 +31,9 @@ public class User {
     @Column(name = "kakao_id", unique = true)
     private String kakaoId;
 
+    @Column(name = "google_id", unique = true)
+    private String googleId;
+
     @Column(name = "agree_consent", nullable = false)
     private Boolean agreeConsent;
 

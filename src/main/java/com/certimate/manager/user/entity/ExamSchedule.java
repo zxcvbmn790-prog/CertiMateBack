@@ -5,14 +5,24 @@ import lombok.*;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "EXAM_SCHEDULE")
+@Table(name = "exam_schedule")
 @Getter @Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class ExamSchedule {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "schedule_id")
+    @Column(name = "id")
     private Long id;
+
+    @Column(name = "qual_name")
+    private String qualName;
+
+    @Column(name = "exam_round")
+    private String examRound;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private com.certimate.manager.auth.entity.User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cert_id", nullable = false)
@@ -20,6 +30,9 @@ public class ExamSchedule {
 
     @Column(name = "exam_type", nullable = false)
     private String examType;
+    
+    @Column(name = "target_read_count", columnDefinition = "int default 1")
+    private Integer targetReadCount;
 
     @Column(name = "registration_start")
     private LocalDate registrationStart;

@@ -8,5 +8,7 @@ import java.util.List;
 
 @Repository
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, Long> {
-    List<CommunityPost> findByNicknameOrderByCreatedAtDesc(Long nickname);
+    List<CommunityPost> findAllByOrderByPostIdDesc();
+    List<CommunityPost> findTop5ByOrderByViewsDesc();
+    List<CommunityPost> findByNicknameOrderByCreatedAtDesc(Integer nickname);
 }
