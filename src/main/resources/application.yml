@@ -6,12 +6,18 @@ spring:
   # 프로젝트 루트의 .env 파일(커밋 금지)을 property로 읽어들여 ${DB_URL} 등에서 사용할 수 있게 한다.
   config:
     import: optional:file:.env[.properties]
+  # 세 프로필 모두 같은 AWS 공유 DB를 쓰므로 여기 한 곳에만 둔다.
+  # 폴백값 없음 = .env가 없으면 기동 실패(비밀번호가 커밋되는 일 방지).
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
 server:
   port: 8080
 
 jwt:
-  secret: ${JWT_SECRET:YourSuperSecretKeyForCertiMateProject2026!}
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}
 
 kakao:
@@ -29,19 +35,16 @@ gemini:
   # 무료 티어. 한도가 부족하면 gemini-3.6-flash-lite(RPD 더 넉넉)로 변경 가능.
   model: ${GEMINI_MODEL:gemini-3.6-flash}
 
+# 공유 DB라 어느 프로필도 스키마를 건드리지 않는다(ddl-auto: validate).
+# 스키마 변경은 SQL로 직접 적용할 것 — update로 되돌리면 대소문자 중복 테이블이 다시 생긴다.
 ---
 spring:
   config:
     activate:
       on-profile: local
-  datasource:
-    url: ${DB_URL:jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:certimate}
-    password: ${DB_PASSWORD:CertiMate!2026App}
-    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -55,11 +58,6 @@ spring:
   config:
     activate:
       on-profile: dev
-  datasource:
-    url: ${DB_URL:jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:certimate}
-    password: ${DB_PASSWORD:CertiMate!2026App}
-    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
       ddl-auto: validate
@@ -70,11 +68,6 @@ spring:
   config:
     activate:
       on-profile: prod
-  datasource:
-    url: ${DB_URL:jdbc:mysql://54.180.98.39:3306/CertiMate?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
-    username: ${DB_USERNAME:certimate}
-    password: ${DB_PASSWORD:CertiMate!2026App}
-    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
       ddl-auto: validate
