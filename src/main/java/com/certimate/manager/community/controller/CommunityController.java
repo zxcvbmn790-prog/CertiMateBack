@@ -163,11 +163,14 @@ public class CommunityController {
     }
 
     /**
-     * BEST 인기글 (조회수 기준 내림차순 상위 5개) 조회 API
+     * BEST 인기글 (조회순 또는 추천순 기준 내림차순 상위 5개) 조회 API
+     * sort: "views" (기본값, 조회순), "recommendations" (추천순)
      */
     @GetMapping("/posts/best")
-    public ResponseEntity<List<CommunityPostResponseDto>> getBestPosts() {
-        List<CommunityPostResponseDto> bestPosts = communityPostService.getBestPosts();
+    public ResponseEntity<List<CommunityPostResponseDto>> getBestPosts(
+            @RequestParam(value = "sort", required = false, defaultValue = "views") String sort
+    ) {
+        List<CommunityPostResponseDto> bestPosts = communityPostService.getBestPosts(sort);
         return ResponseEntity.ok(bestPosts);
     }
 

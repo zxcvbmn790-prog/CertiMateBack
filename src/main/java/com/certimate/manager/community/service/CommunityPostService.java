@@ -146,16 +146,27 @@ public class CommunityPostService {
     }
 
     /**
-     * BEST 인기글 (조회수 기준 내림차순 상위 5개) 조회
+     * BEST 인기글 (조회순 또는 추천순 내림차순 상위 5개) 조회
+     * @param sort "views" (조회순) 또는 "recommendations" (추천순)
      */
-    public List<CommunityPostResponseDto> getBestPosts() {
-        return communityPostRepository.findTop5ByOrderByViewsDesc().stream()
+    public List<CommunityPostResponseDto> getBestPosts(String sort) {
+        List<CommunityPost> posts;
+        if ("recommendations".equalsIgnoreCase(sort) || "recommend".equalsIgnoreCase(sort) || "likes".equalsIgnoreCase(sort)) {
+            posts = communityPostRepository.findTop5ByOrderByRecommendationsDesc();
+        } else {
+            posts = communityPostRepository.findTop5ByOrderByViewsDesc();
+        }
+        return posts.stream()
                 .map(post -> {
                     List<CommentsResponseDto> replyList = getCommentsByPostId(post.getPostId());
                     User user = resolveUser(post);
                     return CommunityPostResponseDto.fromEntity(post, user, replyList);
                 })
                 .collect(Collectors.toList());
+    }
+
+    public List<CommunityPostResponseDto> getBestPosts() {
+        return getBestPosts("views");
     }
 
     /**
