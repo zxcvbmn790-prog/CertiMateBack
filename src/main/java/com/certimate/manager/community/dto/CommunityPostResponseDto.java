@@ -20,6 +20,7 @@ public class CommunityPostResponseDto {
     private String content;
     private String writer;
     private Integer nickname;
+    private Long userId;
     private String date;
     private Integer views;
     private Integer recommendations;
@@ -36,6 +37,14 @@ public class CommunityPostResponseDto {
             writerName = resolvedUser.getName();
         }
 
+        Long finalUserId = post.getUserId();
+        if (finalUserId == null && post.getNickname() != null) {
+            finalUserId = post.getNickname().longValue();
+        }
+        if (finalUserId == null && resolvedUser != null) {
+            finalUserId = resolvedUser.getId();
+        }
+
         return CommunityPostResponseDto.builder()
                 .id(post.getPostId())
                 .category(post.getCategory())
@@ -43,6 +52,7 @@ public class CommunityPostResponseDto {
                 .content(post.getContent())
                 .writer(writerName)
                 .nickname(post.getNickname())
+                .userId(finalUserId)
                 .date(post.getCreatedAt() != null ? post.getCreatedAt().format(formatter) : "")
                 .views(post.getViews())
                 .recommendations(post.getRecommendations())

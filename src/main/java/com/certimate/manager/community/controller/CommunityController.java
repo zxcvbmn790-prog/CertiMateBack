@@ -1,5 +1,7 @@
 package com.certimate.manager.community.controller;
 
+import com.certimate.manager.auth.entity.User;
+import com.certimate.manager.auth.repository.UserRepository;
 import com.certimate.manager.common.ApiResponse;
 import com.certimate.manager.community.dto.*;
 import com.certimate.manager.community.service.CommunityPostService;
@@ -17,7 +19,7 @@ import java.util.List;
 
 /**
  * CertiMate 커뮤니티 (Community) REST Controller
- * 커뮤니티 글쓰기, 목록/상세 조회, 추천, 댓글, 마이페이지 작성글 조회를 처리합니다.
+ * 커뮤니티 글쓰기, 목록/상세 조회, 추천, 수정, 삭제, 댓글, 마이페이지 작성글 조회를 처리합니다.
  */
 @RestController
 @RequestMapping("/api/community")
@@ -26,6 +28,7 @@ public class CommunityController {
 
     private final CommunityService communityService;
     private final CommunityPostService communityPostService;
+    private final UserRepository userRepository;
 
     /**
      * [등록하기 버튼] 새 게시글 작성 API
@@ -37,15 +40,26 @@ public class CommunityController {
             @RequestParam("content") String content,
             @RequestParam(value = "user_id", required = false) Integer nickname,
             @RequestParam(value = "userId", required = false) Long userId,
-            @RequestParam(value = "image", required = false) MultipartFile image
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            Principal principal
     ) {
         try {
+            Long finalUserId = userId;
+            Integer finalNickname = nickname;
+            if (principal != null) {
+                User user = userRepository.findByEmail(principal.getName()).orElse(null);
+                if (user != null) {
+                    finalUserId = user.getId();
+                    finalNickname = user.getId().intValue();
+                }
+            }
+
             CommunityPostRequestDto requestDto = CommunityPostRequestDto.builder()
                     .title(title)
                     .category(category)
                     .content(content)
-                    .nickname(nickname)
-                    .userId(userId)
+                    .nickname(finalNickname)
+                    .userId(finalUserId)
                     .build();
 
             CommunityPostResponseDto responseDto = communityPostService.createPost(requestDto, image);
@@ -53,6 +67,89 @@ public class CommunityController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("게시글 등록에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 게시글 수정 API
+     * 작성자 본인만 수정 가능합니다.
+     */
+    @PutMapping(value = "/posts/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updatePost(
+            @PathVariable("id") Long id,
+            @RequestParam("title") String title,
+            @RequestParam("category") String category,
+            @RequestParam("content") String content,
+            @RequestParam(value = "removeImage", required = false, defaultValue = "false") Boolean removeImage,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "userId", required = false) Long requestUserId,
+            Principal principal
+    ) {
+        try {
+            Long currentUserId = null;
+            if (principal != null) {
+                User user = userRepository.findByEmail(principal.getName()).orElse(null);
+                if (user != null) {
+                    currentUserId = user.getId();
+                }
+            }
+            if (currentUserId == null && requestUserId != null) {
+                currentUserId = requestUserId;
+            }
+            if (currentUserId == null) {
+                throw new CustomException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+            }
+
+            CommunityPostUpdateRequestDto requestDto = CommunityPostUpdateRequestDto.builder()
+                    .title(title)
+                    .category(category)
+                    .content(content)
+                    .removeImage(removeImage)
+                    .build();
+
+            CommunityPostResponseDto responseDto = communityPostService.updatePost(id, currentUserId, requestDto, image);
+            return ResponseEntity.ok(responseDto);
+        } catch (CustomException e) {
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("게시글 수정에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 게시글 삭제 API
+     * 작성자 본인만 삭제 가능합니다.
+     * 연관된 댓글/대댓글, 좋아요, 첨부 이미지, 게시글 데이터가 모두 함께 삭제됩니다.
+     */
+    @DeleteMapping("/posts/{id}")
+    public ResponseEntity<?> deletePost(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "userId", required = false) Long requestUserId,
+            Principal principal
+    ) {
+        try {
+            Long currentUserId = null;
+            if (principal != null) {
+                User user = userRepository.findByEmail(principal.getName()).orElse(null);
+                if (user != null) {
+                    currentUserId = user.getId();
+                }
+            }
+            if (currentUserId == null && requestUserId != null) {
+                currentUserId = requestUserId;
+            }
+            if (currentUserId == null) {
+                throw new CustomException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+            }
+
+            communityPostService.deletePost(id, currentUserId);
+            return ResponseEntity.ok("게시글이 성공적으로 삭제되었습니다.");
+        } catch (CustomException e) {
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("게시글 삭제에 실패했습니다: " + e.getMessage());
         }
     }
 

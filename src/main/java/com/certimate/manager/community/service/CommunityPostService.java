@@ -2,15 +2,15 @@ package com.certimate.manager.community.service;
 
 import com.certimate.manager.auth.entity.User;
 import com.certimate.manager.auth.repository.UserRepository;
-import com.certimate.manager.community.dto.CommentsRequestDto;
-import com.certimate.manager.community.dto.CommentsResponseDto;
-import com.certimate.manager.community.dto.CommunityPostRequestDto;
-import com.certimate.manager.community.dto.CommunityPostResponseDto;
+import com.certimate.manager.community.dto.*;
 import com.certimate.manager.community.entity.Comments;
 import com.certimate.manager.community.entity.CommunityPost;
 import com.certimate.manager.community.repository.CommentsRepository;
+import com.certimate.manager.community.repository.CommunityPostLikeRepository;
 import com.certimate.manager.community.repository.CommunityPostRepository;
+import com.certimate.manager.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,6 +32,7 @@ public class CommunityPostService {
 
     private final CommunityPostRepository communityPostRepository;
     private final CommentsRepository commentsRepository;
+    private final CommunityPostLikeRepository communityPostLikeRepository;
     private final UserRepository userRepository;
 
     // 첨부 이미지 파일 저장 경로 (프로젝트 실행 위치 하위 uploads/)
@@ -66,18 +67,23 @@ public class CommunityPostService {
         }
 
         // 2. nickname(int) 또는 userId 정보로 USER 테이블 조회
+        Long finalUserId = requestDto.getUserId();
         Integer nicknameInt = requestDto.getNickname();
-        if (nicknameInt == null && requestDto.getUserId() != null) {
-            nicknameInt = requestDto.getUserId().intValue();
+        if (nicknameInt == null && finalUserId != null) {
+            nicknameInt = finalUserId.intValue();
+        }
+        if (finalUserId == null && nicknameInt != null) {
+            finalUserId = nicknameInt.longValue();
         }
 
         User user = null;
-        if (nicknameInt != null) {
+        if (finalUserId != null) {
+            user = userRepository.findById(finalUserId).orElse(null);
+        } else if (nicknameInt != null) {
             user = userRepository.findById(nicknameInt.longValue()).orElse(null);
         }
 
         // 3. CommunityPost 엔티티 생성 및 DB 저장
-        Long finalUserId = requestDto.getUserId() != null ? requestDto.getUserId() : (nicknameInt != null ? nicknameInt.longValue() : null);
         CommunityPost post = CommunityPost.builder()
                 .category(requestDto.getCategory() != null && !requestDto.getCategory().isBlank() ? requestDto.getCategory() : "자유게시판")
                 .nickname(nicknameInt)
@@ -105,6 +111,23 @@ public class CommunityPostService {
         }
         if (post.getNickname() != null) {
             return userRepository.findById(post.getNickname().longValue()).orElse(null);
+        }
+        return null;
+    }
+
+    /**
+     * 게시글 작성자 ID 추출 헬퍼 함수
+     */
+    public Long resolveAuthorId(CommunityPost post) {
+        if (post.getUserId() != null) {
+            return post.getUserId();
+        }
+        if (post.getNickname() != null) {
+            return post.getNickname().longValue();
+        }
+        User user = resolveUser(post);
+        if (user != null && user.getId() != null) {
+            return user.getId();
         }
         return null;
     }
@@ -200,5 +223,113 @@ public class CommunityPostService {
         return commentsRepository.findByPostPostIdAndParentIsNullOrderByCommentIdAsc(postId).stream()
                 .map(CommentsResponseDto::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 물리적 파일 삭제 헬퍼 메서드
+     */
+    private void deletePhysicalFile(String imageUrl) {
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            try {
+                String filename = imageUrl.replace("/uploads/", "");
+                Path filePath = Paths.get(uploadDir + filename);
+                Files.deleteIfExists(filePath);
+            } catch (Exception e) {
+                System.err.println("이미지 파일 삭제 실패: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 커뮤니티 게시글 수정
+     * 작성자 본인(userId 일치)만 수정 가능합니다.
+     */
+    @Transactional
+    public CommunityPostResponseDto updatePost(Long id, Long currentUserId, CommunityPostUpdateRequestDto requestDto, MultipartFile newImage) {
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "존재하지 않는 게시글입니다. id=" + id));
+
+        // 작성자 검증
+        Long authorId = resolveAuthorId(post);
+        if (authorId == null || !authorId.equals(currentUserId)) {
+            throw new CustomException(HttpStatus.FORBIDDEN, "본인이 작성한 글만 수정할 수 있습니다.");
+        }
+
+        String imageUrl = post.getImageUrl();
+
+        // 이미지 삭제 요청이 있거나 새 이미지가 업로드된 경우 기존 이미지 삭제
+        if (Boolean.TRUE.equals(requestDto.getRemoveImage()) || (newImage != null && !newImage.isEmpty())) {
+            deletePhysicalFile(imageUrl);
+            imageUrl = null;
+        }
+
+        // 새 이미지 파일 저장
+        if (newImage != null && !newImage.isEmpty()) {
+            try {
+                File dir = new File(uploadDir);
+                if (!dir.exists()) {
+                    dir.mkdirs();
+                }
+
+                String originalFilename = newImage.getOriginalFilename();
+                String storeFilename = UUID.randomUUID().toString() + "_" + (originalFilename != null ? originalFilename : "image.png");
+                Path filePath = Paths.get(uploadDir + storeFilename);
+                Files.copy(newImage.getInputStream(), filePath);
+
+                imageUrl = "/uploads/" + storeFilename;
+            } catch (IOException e) {
+                throw new RuntimeException("새 이미지 파일 저장 중 오류가 발생했습니다.", e);
+            }
+        }
+
+        post.update(requestDto.getCategory(), requestDto.getTitle(), requestDto.getContent(), imageUrl);
+
+        List<CommentsResponseDto> replyList = getCommentsByPostId(id);
+        User user = resolveUser(post);
+        return CommunityPostResponseDto.fromEntity(post, user, replyList);
+    }
+
+    /**
+     * 커뮤니티 게시글 삭제
+     * 작성자 본인(userId 일치)만 삭제 가능합니다.
+     * 게시글 삭제 시:
+     * 1) 연관된 대댓글 및 댓글 삭제
+     * 2) 좋아요 이력 삭제
+     * 3) 첨부 이미지 파일 삭제
+     * 4) 게시글 DB 엔티티 삭제
+     */
+    @Transactional
+    public void deletePost(Long id, Long currentUserId) {
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "존재하지 않는 게시글입니다. id=" + id));
+
+        // 작성자 검증
+        Long authorId = resolveAuthorId(post);
+        if (authorId == null || !authorId.equals(currentUserId)) {
+            throw new CustomException(HttpStatus.FORBIDDEN, "본인이 작성한 글만 삭제할 수 있습니다.");
+        }
+
+        // 1. 연관된 댓글 삭제 (외래키 제약조건 고려: 대댓글(자식) 먼저 삭제 후 부모 댓글 삭제)
+        List<Comments> allComments = commentsRepository.findByPostPostIdOrderByCommentIdAsc(id);
+        if (!allComments.isEmpty()) {
+            List<Comments> childComments = allComments.stream().filter(c -> c.getParent() != null).collect(Collectors.toList());
+            if (!childComments.isEmpty()) {
+                commentsRepository.deleteAllInBatch(childComments);
+            }
+
+            List<Comments> parentComments = allComments.stream().filter(c -> c.getParent() == null).collect(Collectors.toList());
+            if (!parentComments.isEmpty()) {
+                commentsRepository.deleteAllInBatch(parentComments);
+            }
+        }
+
+        // 2. 연관된 좋아요 이력 삭제
+        communityPostLikeRepository.deleteByPostId(id);
+
+        // 3. 첨부 이미지 파일 디스크에서 삭제
+        deletePhysicalFile(post.getImageUrl());
+
+        // 4. 게시글 엔티티 DB 삭제
+        communityPostRepository.delete(post);
     }
 }

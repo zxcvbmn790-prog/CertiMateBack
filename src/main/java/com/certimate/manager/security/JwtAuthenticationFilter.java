@@ -23,13 +23,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = null;
 
-        // 브라우저가 보낸 쿠키함에서 'accessToken'을 찾습니다.
+        // 1. 브라우저가 보낸 쿠키함에서 'accessToken'을 찾습니다.
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("accessToken".equals(cookie.getName())) {
                     token = cookie.getValue();
                     break;
                 }
+            }
+        }
+
+        // 2. 쿠키에 없다면 Authorization 헤더(Bearer 토큰)를 확인합니다.
+        if (token == null || token.isBlank()) {
+            String bearerToken = request.getHeader("Authorization");
+            if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+                token = bearerToken.substring(7);
             }
         }
 

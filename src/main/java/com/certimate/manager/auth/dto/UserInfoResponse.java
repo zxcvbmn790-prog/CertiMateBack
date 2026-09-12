@@ -3,6 +3,7 @@ package com.certimate.manager.auth.dto;
 import com.certimate.manager.auth.entity.User;
 
 public record UserInfoResponse(
+        Long id,
         String name,
         String major,
         String interest,
@@ -12,6 +13,7 @@ public record UserInfoResponse(
 ) {
     public static UserInfoResponse from(User user) {
         return new UserInfoResponse(
+                user.getId(),
                 user.getName(),
                 user.getMajor(),
                 user.getInterest(),

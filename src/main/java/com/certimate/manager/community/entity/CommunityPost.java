@@ -59,4 +59,17 @@ public class CommunityPost {
     public Long getId() {
         return postId;
     }
+
+    public void update(String category, String title, String content, String imageUrl) {
+        if (category != null && !category.isBlank()) {
+            this.category = category;
+        }
+        if (title != null && !title.isBlank()) {
+            this.title = title;
+        }
+        if (content != null && !content.isBlank()) {
+            this.content = content;
+        }
+        this.imageUrl = imageUrl;
+    }
 }
