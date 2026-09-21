@@ -5,6 +5,7 @@ import com.certimate.manager.auth.repository.UserRepository;
 import com.certimate.manager.community.dto.*;
 import com.certimate.manager.community.entity.Comments;
 import com.certimate.manager.community.entity.CommunityPost;
+import com.certimate.manager.community.entity.CommunityPostLike;
 import com.certimate.manager.community.repository.CommentsRepository;
 import com.certimate.manager.community.repository.CommunityPostLikeRepository;
 import com.certimate.manager.community.repository.CommunityPostRepository;
@@ -170,31 +171,91 @@ public class CommunityPostService {
     }
 
     /**
-     * 게시글 상세 조회 및 조회수 증가
+     * 게시글 상세 조회 및 조회수 증가 (로그인 사용자별 좋아요 여부 확인)
      */
     @Transactional
-    public CommunityPostResponseDto getPostDetail(Long id) {
+    public CommunityPostResponseDto getPostDetail(Long id, Long currentUserId) {
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다. id=" + id));
         post.setViews((post.getViews() != null ? post.getViews() : 0) + 1);
 
         List<CommentsResponseDto> replyList = getCommentsByPostId(id);
         User user = resolveUser(post);
-        return CommunityPostResponseDto.fromEntity(post, user, replyList);
+        CommunityPostResponseDto dto = CommunityPostResponseDto.fromEntity(post, user, replyList);
+        if (currentUserId != null) {
+            boolean isLiked = !communityPostLikeRepository.findByPostIdAndNickname(id, currentUserId).isEmpty();
+            dto.setIsLiked(isLiked);
+        }
+        return dto;
+    }
+
+    @Transactional
+    public CommunityPostResponseDto getPostDetail(Long id) {
+        return getPostDetail(id, null);
     }
 
     /**
-     * 게시글 추천(좋아요) 수 1 증가
+     * 게시글 추천(좋아요) 토글 API
+     * 이미 좋아요를 누른 경우 취소(감소 및 기록 삭제), 누르지 않은 경우 추가(증가 및 기록 생성)
      */
     @Transactional
-    public CommunityPostResponseDto recommendPost(Long id) {
+    public CommunityPostResponseDto toggleRecommendPost(Long id, Long currentUserId, Boolean clientLiked) {
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다. id=" + id));
-        post.setRecommendations((post.getRecommendations() != null ? post.getRecommendations() : 0) + 1);
+
+        boolean isLiked;
+        int currentRecs = post.getRecommendations() != null ? post.getRecommendations() : 0;
+
+        if (currentUserId != null) {
+            List<CommunityPostLike> existing = communityPostLikeRepository.findByPostIdAndNickname(id, currentUserId);
+            if (!existing.isEmpty()) {
+                // 이미 좋아요를 누른 상태 -> 취소
+                communityPostLikeRepository.deleteAll(existing);
+                post.setRecommendations(Math.max(0, currentRecs - 1));
+                isLiked = false;
+            } else if (Boolean.TRUE.equals(clientLiked)) {
+                // DB에는 없지만 클라이언트가 이미 좋아요 상태에서 취소 요청한 경우
+                post.setRecommendations(Math.max(0, currentRecs - 1));
+                isLiked = false;
+            } else {
+                // 좋아요 추가
+                CommunityPostLike newLike = CommunityPostLike.builder()
+                        .postId(id)
+                        .nickname(currentUserId)
+                        .build();
+                communityPostLikeRepository.save(newLike);
+                post.setRecommendations(currentRecs + 1);
+                isLiked = true;
+            }
+        } else {
+            // 비로그인 사용자
+            if (clientLiked != null) {
+                if (clientLiked) {
+                    post.setRecommendations(Math.max(0, currentRecs - 1));
+                    isLiked = false;
+                } else {
+                    post.setRecommendations(currentRecs + 1);
+                    isLiked = true;
+                }
+            } else {
+                post.setRecommendations(currentRecs + 1);
+                isLiked = true;
+            }
+        }
 
         List<CommentsResponseDto> replyList = getCommentsByPostId(id);
         User user = resolveUser(post);
-        return CommunityPostResponseDto.fromEntity(post, user, replyList);
+        CommunityPostResponseDto dto = CommunityPostResponseDto.fromEntity(post, user, replyList);
+        dto.setIsLiked(isLiked);
+        return dto;
+    }
+
+    /**
+     * 기존 호환용 recommendPost
+     */
+    @Transactional
+    public CommunityPostResponseDto recommendPost(Long id) {
+        return toggleRecommendPost(id, null, null);
     }
 
     /**

@@ -178,8 +178,23 @@ public class CommunityController {
      * 게시글 상세 조회 API
      */
     @GetMapping("/posts/{id}")
-    public ResponseEntity<CommunityPostResponseDto> getPostDetail(@PathVariable("id") Long id) {
-        CommunityPostResponseDto post = communityPostService.getPostDetail(id);
+    public ResponseEntity<CommunityPostResponseDto> getPostDetail(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "userId", required = false) Long requestUserId,
+            Principal principal
+    ) {
+        Long currentUserId = null;
+        if (principal != null) {
+            User user = userRepository.findByEmail(principal.getName()).orElse(null);
+            if (user != null) {
+                currentUserId = user.getId();
+            }
+        }
+        if (currentUserId == null && requestUserId != null) {
+            currentUserId = requestUserId;
+        }
+
+        CommunityPostResponseDto post = communityPostService.getPostDetail(id, currentUserId);
         return ResponseEntity.ok(post);
     }
 
@@ -187,9 +202,25 @@ public class CommunityController {
      * 게시글 추천 (좋아요) API
      */
     @PostMapping("/posts/{id}/recommend")
-    public ResponseEntity<?> recommendPost(@PathVariable("id") Long id) {
+    public ResponseEntity<?> recommendPost(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "userId", required = false) Long requestUserId,
+            @RequestParam(value = "liked", required = false) Boolean liked,
+            Principal principal
+    ) {
         try {
-            CommunityPostResponseDto responseDto = communityPostService.recommendPost(id);
+            Long currentUserId = null;
+            if (principal != null) {
+                User user = userRepository.findByEmail(principal.getName()).orElse(null);
+                if (user != null) {
+                    currentUserId = user.getId();
+                }
+            }
+            if (currentUserId == null && requestUserId != null) {
+                currentUserId = requestUserId;
+            }
+
+            CommunityPostResponseDto responseDto = communityPostService.toggleRecommendPost(id, currentUserId, liked);
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
             e.printStackTrace();

@@ -13,6 +13,8 @@ import java.util.List;
 public interface CommunityPostLikeRepository extends JpaRepository<CommunityPostLike, Long> {
     List<CommunityPostLike> findByNickname(Long nickname);
 
+    List<CommunityPostLike> findByPostIdAndNickname(Long postId, Long nickname);
+
     @Modifying
     @Query("DELETE FROM CommunityPostLike c WHERE c.postId = :postId")
     void deleteByPostId(@Param("postId") Long postId);

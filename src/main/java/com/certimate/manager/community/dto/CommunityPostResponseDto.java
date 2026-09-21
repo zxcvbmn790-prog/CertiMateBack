@@ -2,6 +2,7 @@ package com.certimate.manager.community.dto;
 
 import com.certimate.manager.auth.entity.User;
 import com.certimate.manager.community.entity.CommunityPost;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.time.format.DateTimeFormatter;
@@ -27,6 +28,10 @@ public class CommunityPostResponseDto {
     private Integer comments;
     private String imageUrl;
     private List<CommentsResponseDto> replyList;
+
+    @JsonProperty("isLiked")
+    @Builder.Default
+    private Boolean isLiked = false;
 
     public static CommunityPostResponseDto fromEntity(CommunityPost post, User user, List<CommentsResponseDto> replyList) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
