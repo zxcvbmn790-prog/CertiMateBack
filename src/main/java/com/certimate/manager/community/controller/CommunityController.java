@@ -1,5 +1,7 @@
 package com.certimate.manager.community.controller;
 
+import com.certimate.manager.auth.entity.User;
+import com.certimate.manager.auth.repository.UserRepository;
 import com.certimate.manager.common.ApiResponse;
 import com.certimate.manager.community.dto.*;
 import com.certimate.manager.community.service.CommunityPostService;
@@ -26,6 +28,7 @@ public class CommunityController {
 
     private final CommunityService communityService;
     private final CommunityPostService communityPostService;
+    private final UserRepository userRepository;
 
     /**
      * [등록하기 버튼] 새 게시글 작성 API
@@ -78,8 +81,23 @@ public class CommunityController {
      * 게시글 상세 조회 API
      */
     @GetMapping("/posts/{id}")
-    public ResponseEntity<CommunityPostResponseDto> getPostDetail(@PathVariable("id") Long id) {
-        CommunityPostResponseDto post = communityPostService.getPostDetail(id);
+    public ResponseEntity<CommunityPostResponseDto> getPostDetail(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "userId", required = false) Long requestUserId,
+            Principal principal
+    ) {
+        Long currentUserId = null;
+        if (principal != null) {
+            User user = userRepository.findByEmail(principal.getName()).orElse(null);
+            if (user != null) {
+                currentUserId = user.getId();
+            }
+        }
+        if (currentUserId == null && requestUserId != null) {
+            currentUserId = requestUserId;
+        }
+
+        CommunityPostResponseDto post = communityPostService.getPostDetail(id, currentUserId);
         return ResponseEntity.ok(post);
     }
 
@@ -87,9 +105,25 @@ public class CommunityController {
      * 게시글 추천 (좋아요) API
      */
     @PostMapping("/posts/{id}/recommend")
-    public ResponseEntity<?> recommendPost(@PathVariable("id") Long id) {
+    public ResponseEntity<?> recommendPost(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "userId", required = false) Long requestUserId,
+            @RequestParam(value = "liked", required = false) Boolean liked,
+            Principal principal
+    ) {
         try {
-            CommunityPostResponseDto responseDto = communityPostService.recommendPost(id);
+            Long currentUserId = null;
+            if (principal != null) {
+                User user = userRepository.findByEmail(principal.getName()).orElse(null);
+                if (user != null) {
+                    currentUserId = user.getId();
+                }
+            }
+            if (currentUserId == null && requestUserId != null) {
+                currentUserId = requestUserId;
+            }
+
+            CommunityPostResponseDto responseDto = communityPostService.toggleRecommendPost(id, currentUserId, liked);
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
             e.printStackTrace();
