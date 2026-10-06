@@ -43,10 +43,10 @@ public class UserController {
         return ApiResponse.success(null);
     }
 
-    @org.springframework.web.bind.annotation.DeleteMapping("/schedule")
-    public ApiResponse<Void> deleteSchedule(Principal principal) {
+    @org.springframework.web.bind.annotation.DeleteMapping("/schedule/{id}")
+    public ApiResponse<Void> deleteSchedule(@org.springframework.web.bind.annotation.PathVariable Long id, Principal principal) {
         requireAuth(principal);
-        userService.deleteSchedule(principal.getName());
+        userService.deleteSchedule(principal.getName(), id);
         return ApiResponse.success(null);
     }
 

@@ -9,7 +9,7 @@ public record DashboardResponse(
         String totalStudyTime,
         String cbtAccuracy,
         List<HeatmapPoint> heatmapData,
-        TargetExam targetExam,
+        List<TargetExam> targetExams,
         List<CertStat> certStats,
         List<CertTrend> certTrends,
         List<CertInfo> allCertifications
@@ -20,7 +20,7 @@ public record DashboardResponse(
 
     public record HeatmapPoint(String date, int count) {}
 
-    public record TargetExam(String certName, String examType, String examDate, long dDay, String achievementRate) {}
+    public record TargetExam(Long id, String certName, String examType, String examDate, long dDay, String achievementRate) {}
 
     public record CertTrend(String certName, List<TrendPoint> trendData) {}
 

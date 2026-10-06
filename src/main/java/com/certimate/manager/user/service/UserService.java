@@ -10,5 +10,5 @@ public interface UserService {
     DashboardResponse getDashboard(String email);
     List<QuizSessionResponse> getQuizHistory(String email, String date);
     void addSchedule(String email, AddScheduleRequest request);
-    void deleteSchedule(String email);
+    void deleteSchedule(String email, Long id);
 }

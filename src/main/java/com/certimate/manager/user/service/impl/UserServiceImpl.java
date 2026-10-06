@@ -86,12 +86,11 @@ public class UserServiceImpl implements UserService {
         List<com.certimate.manager.exam.entity.AiLearn> aiLearns = aiLearnRepository.findAllById(learnIds);
         Map<Long, Long> learnIdToCertId = aiLearns.stream().collect(Collectors.toMap(com.certimate.manager.exam.entity.AiLearn::getLearnId, com.certimate.manager.exam.entity.AiLearn::getCertId));
 
-        DashboardResponse.TargetExam targetExam = null;
+        List<DashboardResponse.TargetExam> targetExams = new ArrayList<>();
         List<com.certimate.manager.user.entity.ExamSchedule> allSchedules = examScheduleRepository.findByUser_IdAndExamDateAfterOrderByExamDateAsc(
                 user.getId(), LocalDate.now().minusDays(1));
 
-        if (!allSchedules.isEmpty()) {
-            com.certimate.manager.user.entity.ExamSchedule upcoming = allSchedules.get(0);
+        for (com.certimate.manager.user.entity.ExamSchedule upcoming : allSchedules) {
             long dDay = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), upcoming.getExamDate());
             
             long solvedSessions = quizHistory.stream()
@@ -104,7 +103,7 @@ public class UserServiceImpl implements UserService {
             long rate = (solvedSessions * 100) / target;
             String rateStr = String.valueOf(Math.min(100, rate));
 
-            targetExam = new DashboardResponse.TargetExam(upcoming.getQualName(), upcoming.getExamType(), upcoming.getExamDate().toString(), dDay, rateStr);
+            targetExams.add(new DashboardResponse.TargetExam(upcoming.getId(), upcoming.getQualName(), upcoming.getExamType(), upcoming.getExamDate().toString(), dDay, rateStr));
         }
 
         String studyTimeStr = totalStudyMin < 60 ? totalStudyMin + "m" : (totalStudyMin / 60) + "h " + (totalStudyMin % 60) + "m";
@@ -160,7 +159,7 @@ public class UserServiceImpl implements UserService {
                 studyTimeStr,
                 String.format("%.0f%%", avgCorrectRate),
                 heatmapData,
-                targetExam,
+                targetExams,
                 certStats,
                 certTrends,
                 allCertInfos
@@ -237,27 +236,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void deleteSchedule(String email) {
-        // Since EXAM_SCHEDULE is global but used per cert, we will find the most recent user learn log
-        // and delete the schedules for that certification to simulate "deleting the user's target exam".
+    public void deleteSchedule(String email, Long id) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        List<com.certimate.manager.user.entity.UserLearnLog> logs = userLearnLogRepository.findByUser_Id(user.getId());
-        if (!logs.isEmpty()) {
-            logs.sort((a, b) -> {
-                if (a.getLastStudiedAt() == null && b.getLastStudiedAt() == null) return 0;
-                if (a.getLastStudiedAt() == null) return 1;
-                if (b.getLastStudiedAt() == null) return -1;
-                return b.getLastStudiedAt().compareTo(a.getLastStudiedAt());
-            });
-            com.certimate.manager.user.entity.UserLearnLog recentLog = logs.get(0);
-            List<com.certimate.manager.user.entity.ExamSchedule> schedules = examScheduleRepository.findByCertification_IdAndExamDateAfterOrderByExamDateAsc(
-                    recentLog.getCertification().getId(), LocalDate.now().minusDays(1));
-            
-            if (!schedules.isEmpty()) {
-                examScheduleRepository.deleteAll(schedules);
-            }
+        com.certimate.manager.user.entity.ExamSchedule schedule = examScheduleRepository.findById(id)
+                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다."));
+
+        if (!schedule.getUser().getId().equals(user.getId())) {
+            throw new CustomException(HttpStatus.FORBIDDEN, "삭제 권한이 없습니다.");
         }
+
+        examScheduleRepository.delete(schedule);
     }
 }
