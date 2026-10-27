@@ -5,6 +5,7 @@ import com.certimate.manager.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +33,8 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // AI 해설 생성·신고는 Gemini 무료 한도를 소모하므로 로그인 필수 (아래 /api/exams/** permitAll보다 먼저 매칭돼야 한다)
+                        .requestMatchers(HttpMethod.POST, "/api/exams/explanations", "/api/exams/*/report-explanation").authenticated()
                         .requestMatchers("/api/auth/**", "/api/exams/**", "/api/community/**", "/api/ai/**", "/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )
