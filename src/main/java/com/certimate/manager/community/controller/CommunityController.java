@@ -38,21 +38,12 @@ public class CommunityController {
             @RequestParam("title") String title,
             @RequestParam("category") String category,
             @RequestParam("content") String content,
-            @RequestParam(value = "user_id", required = false) Integer nickname,
-            @RequestParam(value = "userId", required = false) Long userId,
             @RequestParam(value = "image", required = false) MultipartFile image,
             Principal principal
     ) {
         try {
-            Long finalUserId = userId;
-            Integer finalNickname = nickname;
-            if (principal != null) {
-                User user = userRepository.findByEmail(principal.getName()).orElse(null);
-                if (user != null) {
-                    finalUserId = user.getId();
-                    finalNickname = user.getId().intValue();
-                }
-            }
+            Long finalUserId = requireUserId(principal);
+            Integer finalNickname = finalUserId.intValue();
 
             CommunityPostRequestDto requestDto = CommunityPostRequestDto.builder()
                     .title(title)
@@ -64,6 +55,8 @@ public class CommunityController {
 
             CommunityPostResponseDto responseDto = communityPostService.createPost(requestDto, image);
             return ResponseEntity.ok(responseDto);
+        } catch (CustomException e) {
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("게시글 등록에 실패했습니다: " + e.getMessage());
@@ -82,23 +75,10 @@ public class CommunityController {
             @RequestParam("content") String content,
             @RequestParam(value = "removeImage", required = false, defaultValue = "false") Boolean removeImage,
             @RequestParam(value = "image", required = false) MultipartFile image,
-            @RequestParam(value = "userId", required = false) Long requestUserId,
             Principal principal
     ) {
         try {
-            Long currentUserId = null;
-            if (principal != null) {
-                User user = userRepository.findByEmail(principal.getName()).orElse(null);
-                if (user != null) {
-                    currentUserId = user.getId();
-                }
-            }
-            if (currentUserId == null && requestUserId != null) {
-                currentUserId = requestUserId;
-            }
-            if (currentUserId == null) {
-                throw new CustomException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
-            }
+            Long currentUserId = requireUserId(principal);
 
             CommunityPostUpdateRequestDto requestDto = CommunityPostUpdateRequestDto.builder()
                     .title(title)
@@ -125,23 +105,10 @@ public class CommunityController {
     @DeleteMapping("/posts/{id}")
     public ResponseEntity<?> deletePost(
             @PathVariable("id") Long id,
-            @RequestParam(value = "userId", required = false) Long requestUserId,
             Principal principal
     ) {
         try {
-            Long currentUserId = null;
-            if (principal != null) {
-                User user = userRepository.findByEmail(principal.getName()).orElse(null);
-                if (user != null) {
-                    currentUserId = user.getId();
-                }
-            }
-            if (currentUserId == null && requestUserId != null) {
-                currentUserId = requestUserId;
-            }
-            if (currentUserId == null) {
-                throw new CustomException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
-            }
+            Long currentUserId = requireUserId(principal);
 
             communityPostService.deletePost(id, currentUserId);
             return ResponseEntity.ok("게시글이 성공적으로 삭제되었습니다.");
@@ -180,19 +147,10 @@ public class CommunityController {
     @GetMapping("/posts/{id}")
     public ResponseEntity<CommunityPostResponseDto> getPostDetail(
             @PathVariable("id") Long id,
-            @RequestParam(value = "userId", required = false) Long requestUserId,
             Principal principal
     ) {
-        Long currentUserId = null;
-        if (principal != null) {
-            User user = userRepository.findByEmail(principal.getName()).orElse(null);
-            if (user != null) {
-                currentUserId = user.getId();
-            }
-        }
-        if (currentUserId == null && requestUserId != null) {
-            currentUserId = requestUserId;
-        }
+        // 좋아요 여부 표시용. 비로그인이면 null.
+        Long currentUserId = principal != null ? findUserId(principal) : null;
 
         CommunityPostResponseDto post = communityPostService.getPostDetail(id, currentUserId);
         return ResponseEntity.ok(post);
@@ -204,24 +162,16 @@ public class CommunityController {
     @PostMapping("/posts/{id}/recommend")
     public ResponseEntity<?> recommendPost(
             @PathVariable("id") Long id,
-            @RequestParam(value = "userId", required = false) Long requestUserId,
             @RequestParam(value = "liked", required = false) Boolean liked,
             Principal principal
     ) {
         try {
-            Long currentUserId = null;
-            if (principal != null) {
-                User user = userRepository.findByEmail(principal.getName()).orElse(null);
-                if (user != null) {
-                    currentUserId = user.getId();
-                }
-            }
-            if (currentUserId == null && requestUserId != null) {
-                currentUserId = requestUserId;
-            }
+            Long currentUserId = requireUserId(principal);
 
             CommunityPostResponseDto responseDto = communityPostService.toggleRecommendPost(id, currentUserId, liked);
             return ResponseEntity.ok(responseDto);
+        } catch (CustomException e) {
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("게시글 추천 처리에 실패했습니다: " + e.getMessage());
@@ -232,10 +182,17 @@ public class CommunityController {
      * 댓글(comments) 작성 API
      */
     @PostMapping("/comments")
-    public ResponseEntity<?> createComment(@RequestBody CommentsRequestDto requestDto) {
+    public ResponseEntity<?> createComment(@RequestBody CommentsRequestDto requestDto, Principal principal) {
         try {
+            // 작성자는 요청 본문(userId/writer)이 아니라 로그인 정보로 정한다.
+            User user = userRepository.findById(requireUserId(principal))
+                    .orElseThrow(() -> new CustomException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."));
+            requestDto.setUserId(user.getId());
+            requestDto.setWriter(user.getName() != null && !user.getName().isBlank() ? user.getName() : "익명");
             CommentsResponseDto responseDto = communityPostService.createComment(requestDto);
             return ResponseEntity.ok(responseDto);
+        } catch (CustomException e) {
+            return ResponseEntity.status(e.getStatus()).body(e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("댓글 등록에 실패했습니다: " + e.getMessage());
@@ -267,6 +224,21 @@ public class CommunityController {
     public ApiResponse<List<CommunityPostResponse>> getLikedPosts(Principal principal) {
         requireAuth(principal);
         return ApiResponse.success(communityService.getLikedPosts(principal.getName()));
+    }
+
+    // 쓰기 API의 사용자는 로그인 정보로만 정한다. 요청 파라미터의 userId는 위조할 수 있어 받지 않는다.
+    // (/api/community/** 는 permitAll이라 여기서 직접 막아야 한다.)
+    private Long requireUserId(Principal principal) {
+        requireAuth(principal);
+        Long id = findUserId(principal);
+        if (id == null) {
+            throw new CustomException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+        }
+        return id;
+    }
+
+    private Long findUserId(Principal principal) {
+        return userRepository.findByEmail(principal.getName()).map(User::getId).orElse(null);
     }
 
     private void requireAuth(Principal principal) {
