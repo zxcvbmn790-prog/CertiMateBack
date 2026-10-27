@@ -122,6 +122,8 @@ public class AuthServiceImpl implements AuthService {
 
             JsonNode tokenNode = objectMapper.readTree(tokenResponse.getBody());
             String kakaoAccessToken = tokenNode.get("access_token").asText();
+            String kakaoRefreshToken = tokenNode.has("refresh_token") && !tokenNode.get("refresh_token").isNull()
+                    ? tokenNode.get("refresh_token").asText() : null;
 
             // STEP 2: 받은 '카카오 액세스 토큰'으로 실제 '카카오 유저 정보'를 요청합니다.
             HttpHeaders infoHeaders = new HttpHeaders();
@@ -169,6 +171,9 @@ public class AuthServiceImpl implements AuthService {
                         .password(passwordEncoder.encode(UUID.randomUUID().toString())) // 카카오 유저는 비번을 몰라도 됨
                         .name(name)
                         .kakaoId(kakaoId)
+                        .kakaoAccessToken(kakaoAccessToken)
+                        .kakaoRefreshToken(kakaoRefreshToken)
+                        .kakaoNotifyEnabled(true)
                         .profileImage(profileImage)
                         .agreeConsent(true) // 카카오 가입 시 동의한 것으로 간주
                         .major("미입력")
@@ -176,6 +181,7 @@ public class AuthServiceImpl implements AuthService {
                 userRepository.save(user);
             } else {
                 user.applySocialProfileImage(profileImage); // 기존 유저는 이미지 없을 때만 백필
+                user.updateKakaoTokens(kakaoAccessToken, kakaoRefreshToken);
                 userRepository.save(user);
             }
 

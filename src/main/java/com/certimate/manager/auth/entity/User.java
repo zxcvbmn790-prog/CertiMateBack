@@ -31,6 +31,21 @@ public class User {
     @Column(name = "kakao_id", unique = true)
     private String kakaoId;
 
+    @Column(name = "kakao_access_token", length = 512)
+    private String kakaoAccessToken;
+
+    @Column(name = "kakao_refresh_token", length = 512)
+    private String kakaoRefreshToken;
+
+    @Column(name = "kakao_notify_enabled")
+    private Boolean kakaoNotifyEnabled;
+
+    @Column(name = "kakao_notify_days", length = 100)
+    private String kakaoNotifyDays;
+
+    @Column(name = "kakao_notify_time", length = 10)
+    private String kakaoNotifyTime;
+
     @Column(name = "google_id", unique = true)
     private String googleId;
 
@@ -64,6 +79,40 @@ public class User {
     public void applySocialProfileImage(String url) {
         if (url != null && !url.isBlank() && (this.profileImage == null || this.profileImage.isBlank())) {
             this.profileImage = url;
+        }
+    }
+
+    public void updateKakaoTokens(String accessToken, String refreshToken) {
+        if (accessToken != null && !accessToken.isBlank()) {
+            this.kakaoAccessToken = accessToken;
+        }
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            this.kakaoRefreshToken = refreshToken;
+        }
+        if (this.kakaoNotifyEnabled == null) {
+            this.kakaoNotifyEnabled = true;
+        }
+        if (this.kakaoNotifyDays == null || this.kakaoNotifyDays.isBlank()) {
+            this.kakaoNotifyDays = "7,1";
+        }
+        if (this.kakaoNotifyTime == null || this.kakaoNotifyTime.isBlank()) {
+            this.kakaoNotifyTime = "09:00";
+        }
+    }
+
+    public void updateKakaoNotifyEnabled(Boolean enabled) {
+        this.kakaoNotifyEnabled = enabled;
+    }
+
+    public void updateKakaoNotifySettings(Boolean enabled, String notifyDays, String notifyTime) {
+        if (enabled != null) {
+            this.kakaoNotifyEnabled = enabled;
+        }
+        if (notifyDays != null && !notifyDays.isBlank()) {
+            this.kakaoNotifyDays = notifyDays;
+        }
+        if (notifyTime != null && !notifyTime.isBlank()) {
+            this.kakaoNotifyTime = notifyTime;
         }
     }
 }

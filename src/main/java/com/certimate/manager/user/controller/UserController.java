@@ -4,6 +4,7 @@ import com.certimate.manager.common.ApiResponse;
 import com.certimate.manager.user.dto.DashboardResponse;
 import com.certimate.manager.user.dto.QuizSessionResponse;
 import com.certimate.manager.exception.CustomException;
+import com.certimate.manager.user.service.KakaoNotificationService;
 import com.certimate.manager.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user")
@@ -23,6 +25,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final KakaoNotificationService kakaoNotificationService;
 
     @GetMapping("/dashboard")
     public ApiResponse<DashboardResponse> getDashboard(Principal principal) {
@@ -47,6 +50,34 @@ public class UserController {
     public ApiResponse<Void> deleteSchedule(@org.springframework.web.bind.annotation.PathVariable Long id, Principal principal) {
         requireAuth(principal);
         userService.deleteSchedule(principal.getName(), id);
+        return ApiResponse.success(null);
+    }
+
+    @GetMapping("/kakao-notification/status")
+    public ApiResponse<Map<String, Object>> getKakaoNotificationStatus(Principal principal) {
+        requireAuth(principal);
+        return ApiResponse.success(kakaoNotificationService.getStatus(principal.getName()));
+    }
+
+    @PostMapping("/kakao-notification/connect")
+    public ApiResponse<Void> connectKakaoNotification(@RequestBody Map<String, String> body, Principal principal) {
+        requireAuth(principal);
+        kakaoNotificationService.connectKakao(
+                principal.getName(),
+                body.get("code"),
+                body.get("notifyDays"),
+                body.get("notifyTime")
+        );
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/kakao-notification/settings")
+    public ApiResponse<Void> updateKakaoNotificationSettings(@RequestBody Map<String, Object> body, Principal principal) {
+        requireAuth(principal);
+        Boolean enabled = body.get("enabled") != null ? Boolean.valueOf(body.get("enabled").toString()) : null;
+        String notifyDays = body.get("notifyDays") != null ? body.get("notifyDays").toString() : null;
+        String notifyTime = body.get("notifyTime") != null ? body.get("notifyTime").toString() : null;
+        kakaoNotificationService.updateSettings(principal.getName(), enabled, notifyDays, notifyTime);
         return ApiResponse.success(null);
     }
 
