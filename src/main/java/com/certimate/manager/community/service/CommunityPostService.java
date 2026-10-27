@@ -21,8 +21,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -137,11 +140,24 @@ public class CommunityPostService {
      * 전체 게시글 목록 조회
      */
     public List<CommunityPostResponseDto> getAllPosts() {
-        return communityPostRepository.findAllByOrderByPostIdDesc().stream()
+        return toListItems(communityPostRepository.findAllByOrderByPostIdDesc());
+    }
+
+    // 목록에는 댓글 본문 없이 개수만 담는다(본문은 상세 조회에서 준다).
+    // 글 목록 + 작성자(조인) + 댓글 수(group by 한 번) = 쿼리 2번. 글 수와 무관하다.
+    private List<CommunityPostResponseDto> toListItems(List<CommunityPost> posts) {
+        if (posts.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Long> commentCounts = commentsRepository.countByPostIds(posts.stream().map(CommunityPost::getPostId).toList())
+                .stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+
+        return posts.stream()
                 .map(post -> {
-                    List<CommentsResponseDto> replyList = getCommentsByPostId(post.getPostId());
-                    User user = resolveUser(post);
-                    return CommunityPostResponseDto.fromEntity(post, user, replyList);
+                    CommunityPostResponseDto dto = CommunityPostResponseDto.fromEntity(post, resolveUser(post), Collections.emptyList());
+                    dto.setComments(commentCounts.getOrDefault(post.getPostId(), 0L).intValue());
+                    return dto;
                 })
                 .collect(Collectors.toList());
     }
@@ -157,13 +173,7 @@ public class CommunityPostService {
         } else {
             posts = communityPostRepository.findTop5ByOrderByViewsDesc();
         }
-        return posts.stream()
-                .map(post -> {
-                    List<CommentsResponseDto> replyList = getCommentsByPostId(post.getPostId());
-                    User user = resolveUser(post);
-                    return CommunityPostResponseDto.fromEntity(post, user, replyList);
-                })
-                .collect(Collectors.toList());
+        return toListItems(posts);
     }
 
     public List<CommunityPostResponseDto> getBestPosts() {
@@ -292,9 +302,20 @@ public class CommunityPostService {
      * 게시글 ID에 해당하는 댓글 목록 조회 (계층형 대댓글 포함)
      */
     public List<CommentsResponseDto> getCommentsByPostId(Long postId) {
-        return commentsRepository.findByPostPostIdAndParentIsNullOrderByCommentIdAsc(postId).stream()
-                .map(CommentsResponseDto::fromEntity)
-                .collect(Collectors.toList());
+        // 댓글마다 답글을 지연 로딩하면 댓글 수만큼 쿼리가 나가므로, 한 번에 다 읽고 메모리에서 트리를 만든다.
+        Map<Long, CommentsResponseDto> byId = new LinkedHashMap<>();
+        List<CommentsResponseDto> roots = new ArrayList<>();
+        for (Comments comment : commentsRepository.findByPostPostIdOrderByCommentIdAsc(postId)) {
+            CommentsResponseDto dto = CommentsResponseDto.fromEntityWithoutChildren(comment);
+            byId.put(dto.getId(), dto);
+            CommentsResponseDto parent = dto.getParentId() != null ? byId.get(dto.getParentId()) : null;
+            if (parent != null) {
+                parent.getChildren().add(dto);
+            } else {
+                roots.add(dto);
+            }
+        }
+        return roots;
     }
 
     /**
