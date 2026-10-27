@@ -53,7 +53,16 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        int certCount = userCertificationRepository.countByUser_Id(user.getId());
+        List<com.certimate.manager.user.entity.UserCertification> ownedList = userCertificationRepository.findByUser_Id(user.getId());
+        int certCount = ownedList.size();
+        List<DashboardResponse.AcquiredCert> acquiredCertifications = ownedList.stream()
+                .map(uc -> new DashboardResponse.AcquiredCert(
+                        uc.getId(),
+                        uc.getCertification() != null ? uc.getCertification().getId() : null,
+                        uc.getCertification() != null ? uc.getCertification().getCertName() : "알 수 없음",
+                        uc.getAcquiredDate() != null ? uc.getAcquiredDate().toString() : LocalDate.now().toString()
+                ))
+                .collect(Collectors.toList());
 
         List<UserScrap> scraps = userScrapRepository.findByUser_Id(user.getId());
         int scrapCount = scraps.size();
@@ -92,9 +101,10 @@ public class UserServiceImpl implements UserService {
 
         for (com.certimate.manager.user.entity.ExamSchedule upcoming : allSchedules) {
             long dDay = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), upcoming.getExamDate());
+            Long upcomingCertId = upcoming.getCertification() != null ? upcoming.getCertification().getId() : null;
             
             long solvedSessions = quizHistory.stream()
-                    .filter(q -> learnIdToCertId.get(q.getLearnId()) != null && learnIdToCertId.get(q.getLearnId()).equals(upcoming.getCertification().getId()) && q.getSolvedAt() != null)
+                    .filter(q -> learnIdToCertId.get(q.getLearnId()) != null && upcomingCertId != null && learnIdToCertId.get(q.getLearnId()).equals(upcomingCertId) && q.getSolvedAt() != null)
                     .map(q -> q.getSolvedAt().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE))
                     .distinct()
                     .count();
@@ -103,7 +113,7 @@ public class UserServiceImpl implements UserService {
             long rate = (solvedSessions * 100) / target;
             String rateStr = String.valueOf(Math.min(100, rate));
 
-            targetExams.add(new DashboardResponse.TargetExam(upcoming.getId(), upcoming.getQualName(), upcoming.getExamType(), upcoming.getExamDate().toString(), dDay, rateStr));
+            targetExams.add(new DashboardResponse.TargetExam(upcoming.getId(), upcomingCertId, upcoming.getQualName(), upcoming.getExamType(), upcoming.getExamDate().toString(), dDay, rateStr));
         }
 
         String studyTimeStr = totalStudyMin < 60 ? totalStudyMin + "m" : (totalStudyMin / 60) + "h " + (totalStudyMin % 60) + "m";
@@ -162,7 +172,8 @@ public class UserServiceImpl implements UserService {
                 targetExams,
                 certStats,
                 certTrends,
-                allCertInfos
+                allCertInfos,
+                acquiredCertifications
         );
     }
 
@@ -213,14 +224,33 @@ public class UserServiceImpl implements UserService {
         return sessions;
     }
 
+    private com.certimate.manager.user.entity.Certification resolveOrCreateCertification(Long certId, String certName) {
+        if (certId != null) {
+            return certificationRepository.findById(certId)
+                    .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "자격증을 찾을 수 없습니다."));
+        }
+        if (certName != null && !certName.isBlank()) {
+            String trimmed = certName.trim();
+            return certificationRepository.findByCertName(trimmed)
+                    .orElseGet(() -> certificationRepository.save(
+                            com.certimate.manager.user.entity.Certification.builder()
+                                    .certName(trimmed)
+                                    .difficulty("국가기술/전문")
+                                    .agency("공인기관")
+                                    .views(0)
+                                    .build()
+                    ));
+        }
+        throw new CustomException(HttpStatus.BAD_REQUEST, "자격증을 선택하거나 입력해주세요.");
+    }
+
     @Override
     @Transactional
     public void addSchedule(String email, com.certimate.manager.user.dto.AddScheduleRequest request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        com.certimate.manager.user.entity.Certification cert = certificationRepository.findById(request.certId())
-                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "자격증을 찾을 수 없습니다."));
+        com.certimate.manager.user.entity.Certification cert = resolveOrCreateCertification(request.certId(), request.certName());
 
         com.certimate.manager.user.entity.ExamSchedule schedule = com.certimate.manager.user.entity.ExamSchedule.builder()
                 .user(user)
@@ -248,5 +278,53 @@ public class UserServiceImpl implements UserService {
         }
 
         examScheduleRepository.delete(schedule);
+    }
+
+    @Override
+    @Transactional
+    public void addAcquiredCertification(String email, com.certimate.manager.user.dto.AddAcquiredCertRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        com.certimate.manager.user.entity.Certification cert = resolveOrCreateCertification(request.certId(), request.certName());
+
+        // 이미 보유 자격증으로 등록되어 있는지 확인
+        List<com.certimate.manager.user.entity.UserCertification> existing = userCertificationRepository.findByUser_Id(user.getId());
+        boolean alreadyOwned = existing.stream()
+                .anyMatch(uc -> uc.getCertification() != null && uc.getCertification().getId().equals(cert.getId()));
+
+        if (!alreadyOwned) {
+            com.certimate.manager.user.entity.UserCertification newCert = com.certimate.manager.user.entity.UserCertification.builder()
+                    .user(user)
+                    .certification(cert)
+                    .acquiredDate(request.acquiredDate() != null ? request.acquiredDate() : LocalDate.now())
+                    .build();
+            userCertificationRepository.save(newCert);
+        }
+
+        // 목표 시험 일정에서 합격 전환한 경우 해당 시험 일정도 함께 정리
+        if (request.fromScheduleId() != null) {
+            examScheduleRepository.findById(request.fromScheduleId()).ifPresent(schedule -> {
+                if (schedule.getUser().getId().equals(user.getId())) {
+                    examScheduleRepository.delete(schedule);
+                }
+            });
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteAcquiredCertification(String email, Long id) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        com.certimate.manager.user.entity.UserCertification uc = userCertificationRepository.findById(id)
+                .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "보유 자격증 정보를 찾을 수 없습니다."));
+
+        if (!uc.getUser().getId().equals(user.getId())) {
+            throw new CustomException(HttpStatus.FORBIDDEN, "삭제 권한이 없습니다.");
+        }
+
+        userCertificationRepository.delete(uc);
     }
 }

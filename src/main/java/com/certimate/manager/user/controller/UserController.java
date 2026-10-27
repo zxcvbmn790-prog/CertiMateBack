@@ -53,6 +53,20 @@ public class UserController {
         return ApiResponse.success(null);
     }
 
+    @PostMapping("/certifications")
+    public ApiResponse<Void> addAcquiredCertification(@RequestBody com.certimate.manager.user.dto.AddAcquiredCertRequest request, Principal principal) {
+        requireAuth(principal);
+        userService.addAcquiredCertification(principal.getName(), request);
+        return ApiResponse.success(null);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/certifications/{id}")
+    public ApiResponse<Void> deleteAcquiredCertification(@org.springframework.web.bind.annotation.PathVariable Long id, Principal principal) {
+        requireAuth(principal);
+        userService.deleteAcquiredCertification(principal.getName(), id);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/kakao-notification/status")
     public ApiResponse<Map<String, Object>> getKakaoNotificationStatus(Principal principal) {
         requireAuth(principal);
