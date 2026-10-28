@@ -74,13 +74,12 @@ public class KakaoNotificationService {
     /**
      * 현재 로그인한 사용자의 카카오톡 알림 연동 상태 및 주기/시간 설정을 조회합니다.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> getStatus(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        boolean connected = (user.getKakaoRefreshToken() != null && !user.getKakaoRefreshToken().isBlank())
-                || (user.getKakaoAccessToken() != null && !user.getKakaoAccessToken().isBlank());
+        boolean connected = hasTalkMessageScope(user);
         boolean enabled = user.getKakaoNotifyEnabled() != null ? user.getKakaoNotifyEnabled() : false;
         String notifyDays = (user.getKakaoNotifyDays() != null && !user.getKakaoNotifyDays().isBlank())
                 ? user.getKakaoNotifyDays() : "7,1";
@@ -348,6 +347,48 @@ public class KakaoNotificationService {
                 request,
                 String.class
         );
+    }
+
+    private boolean hasTalkMessageScope(User user) {
+        if ((user.getKakaoAccessToken() == null || user.getKakaoAccessToken().isBlank())
+                && (user.getKakaoRefreshToken() == null || user.getKakaoRefreshToken().isBlank())) {
+            return false;
+        }
+        String accessToken = user.getKakaoAccessToken();
+        try {
+            if (accessToken == null || accessToken.isBlank()) {
+                accessToken = refreshKakaoAccessToken(user);
+            }
+            return queryTalkMessageScope(accessToken);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            try {
+                String refreshed = refreshKakaoAccessToken(user);
+                return queryTalkMessageScope(refreshed);
+            } catch (Exception ex) {
+                return false;
+            }
+        } catch (Exception e) {
+            log.warn("[KakaoNotificationService] talk_message 권한 조회 실패: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean queryTalkMessageScope(String accessToken) throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Authorization", "Bearer " + accessToken);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = restTemplate.exchange(
+                "https://kapi.kakao.com/v2/user/scopes", HttpMethod.GET, entity, String.class);
+        JsonNode root = objectMapper.readTree(response.getBody());
+        JsonNode scopes = root.path("scopes");
+        if (scopes.isArray()) {
+            for (JsonNode scope : scopes) {
+                if ("talk_message".equals(scope.path("id").asText())) {
+                    return scope.path("agreed").asBoolean(false);
+                }
+            }
+        }
+        return false;
     }
 
     private String refreshKakaoAccessToken(User user) {

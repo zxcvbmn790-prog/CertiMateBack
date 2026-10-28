@@ -33,3 +33,4 @@ target/
 *.log
 env
 build/
+uploads/

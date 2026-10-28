@@ -33,6 +33,11 @@ public class JobMatchingService {
     private final ExamScheduleRepository examScheduleRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private static final List<String> KNOWN_CERTS = List.of(
+            "정보처리기사", "정보처리산업기사", "SQLD", "ADsP", "리눅스마스터",
+            "네트워크관리사", "빅데이터분석기사", "정보보안기사", "컴퓨터활용능력", "전기기사"
+    );
+
     private static final Pattern ITEM_PATTERN = Pattern.compile(
             "<div class=\"item_recruit\"\\s+value=\"(\\d+)\"[\\s\\S]*?(?=<div class=\"item_recruit\"\\s+value=\"|<div class=\"pagination\"|$)"
     );
@@ -107,10 +112,19 @@ public class JobMatchingService {
 
         List<String> myCertifications = new ArrayList<>(myCertSet);
 
-        // 검색할 기준 자격증 결정
+        // 검색할 기준 자격증 결정 (유효한 자격증 명칭인지 검증)
         String baseCertKeyword;
         if (keyword != null && !keyword.isBlank() && !"AUTO".equalsIgnoreCase(keyword)) {
-            baseCertKeyword = keyword.trim();
+            String trimmed = keyword.trim();
+            boolean isValid = myCertifications.stream().anyMatch(c -> c.equalsIgnoreCase(trimmed) || c.contains(trimmed) || trimmed.contains(c))
+                    || KNOWN_CERTS.stream().anyMatch(c -> c.equalsIgnoreCase(trimmed) || c.contains(trimmed) || trimmed.contains(c));
+            if (isValid) {
+                baseCertKeyword = trimmed;
+            } else if (!myCertifications.isEmpty()) {
+                baseCertKeyword = myCertifications.get(0);
+            } else {
+                baseCertKeyword = "정보처리기사";
+            }
         } else if (!myCertifications.isEmpty()) {
             baseCertKeyword = myCertifications.get(0);
         } else {

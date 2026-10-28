@@ -9,6 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 해설이 없는 문제에 대해 Google Gemini(무료 티어)로 해설을 생성한다.
  * API 키가 없으면 이 기능만 실패하고 나머지 서비스는 정상 동작한다.
@@ -20,8 +23,14 @@ public class AiExplanationService {
     @Value("${gemini.api-key:}")
     private String apiKey;
 
-    @Value("${gemini.model:gemini-2.5-flash}")
+    @Value("${gemini.model:gemini-3-flash-preview}")
     private String model;
+
+    private static final List<String> FALLBACK_MODELS = List.of(
+            "gemini-3-flash-preview",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash"
+    );
 
     public boolean isEnabled() {
         return apiKey != null && !apiKey.isBlank();
@@ -48,21 +57,32 @@ public class AiExplanationService {
                 정답 번호: %s
                 """.formatted(q.getQuestion(), q.getOptions(), q.getAnswer());
 
-        // ponytail: 요청마다 클라이언트 생성. 호출량 늘면 @Bean 싱글턴으로 승격.
-        try {
-            Client client = Client.builder().apiKey(apiKey).build();
-            GenerateContentResponse response = client.models.generateContent(model, prompt, null);
-
-            String text = response.text();
-            if (text == null || text.isBlank()) {
-                throw new CustomException(HttpStatus.BAD_GATEWAY, "AI가 빈 해설을 반환했습니다.");
-            }
-            return text.trim();
-        } catch (CustomException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("AI 해설 생성 실패 (learnId={})", q.getLearnId(), e);
-            throw new CustomException(HttpStatus.BAD_GATEWAY, "AI 해설 생성에 실패했습니다.");
+        List<String> modelsToTry = new ArrayList<>();
+        if (model != null && !model.isBlank()) {
+            modelsToTry.add(model.trim());
         }
+        for (String fb : FALLBACK_MODELS) {
+            if (!modelsToTry.contains(fb)) {
+                modelsToTry.add(fb);
+            }
+        }
+
+        Exception lastErr = null;
+        Client client = Client.builder().apiKey(apiKey).build();
+        for (String candidateModel : modelsToTry) {
+            try {
+                GenerateContentResponse response = client.models.generateContent(candidateModel, prompt, null);
+                String text = response.text();
+                if (text != null && !text.isBlank()) {
+                    return text.trim();
+                }
+            } catch (Exception e) {
+                lastErr = e;
+                log.warn("AI 해설 생성 모델 호출 실패 (model={}, learnId={}): {}", candidateModel, q.getLearnId(), e.getMessage());
+            }
+        }
+
+        log.error("AI 해설 생성 최종 실패 (learnId={})", q.getLearnId(), lastErr);
+        throw new CustomException(HttpStatus.BAD_GATEWAY, "AI 해설 생성에 실패했습니다.");
     }
 }

@@ -2,16 +2,17 @@ package com.certimate.manager.exam.service;
 
 import com.certimate.manager.exam.dto.AiRecommendRequest;
 import com.certimate.manager.exam.dto.AiRecommendResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+@Slf4j
 @Service
 public class AiRecommendationService {
 
@@ -21,18 +22,27 @@ public class AiRecommendationService {
     @Value("${gemini.model:gemini-3.6-flash}")
     private String geminiModel;
 
+    private static final List<String> FALLBACK_MODELS = List.of(
+            "gemini-3-flash-preview",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
+            "gemini-3.1-flash-lite"
+    );
+
     private final RestTemplate restTemplate;
 
     public AiRecommendationService() {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000);
+        factory.setReadTimeout(35000);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     public AiRecommendResponse getRecommendation(AiRecommendRequest request) {
         if (geminiApiKey == null || geminiApiKey.isEmpty()) {
             return new AiRecommendResponse("AI API 키가 설정되지 않았습니다. 백엔드의 .env 파일을 확인해 주세요.");
         }
-
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + geminiModel + ":generateContent?key=" + geminiApiKey;
 
         // 프롬프트 구성
         String prompt = "당신은 IT 자격증 전문 진로 상담 AI 'CertiMate'입니다.\n" +
@@ -47,7 +57,6 @@ public class AiRecommendationService {
                 "  { \"rank\": 3, \"name\": \"자격증 이름\", \"reason\": \"상세한 추천 이유\" }\n" +
                 "]";
 
-        // 요청 바디 생성 (Gemini API 스펙)
         Map<String, Object> requestBody = new HashMap<>();
         List<Map<String, Object>> contents = new ArrayList<>();
         Map<String, Object> content = new HashMap<>();
@@ -64,28 +73,55 @@ public class AiRecommendationService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-        try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            Map<String, Object> body = response.getBody();
-            
-            // 응답 파싱
-            if (body != null && body.containsKey("candidates")) {
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
-                if (!candidates.isEmpty()) {
-                    Map<String, Object> contentResp = (Map<String, Object>) candidates.get(0).get("content");
-                    List<Map<String, Object>> respParts = (List<Map<String, Object>>) contentResp.get("parts");
-                    if (!respParts.isEmpty()) {
-                        String text = (String) respParts.get(0).get("text");
-                        // 마크다운 블록이 포함되어 있다면 제거
-                        text = text.replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```\\s*$", "").trim();
-                        return new AiRecommendResponse(text);
+        List<String> modelsToTry = new ArrayList<>();
+        if (geminiModel != null && !geminiModel.isBlank()) {
+            modelsToTry.add(geminiModel.trim());
+        }
+        for (String fb : FALLBACK_MODELS) {
+            if (!modelsToTry.contains(fb)) {
+                modelsToTry.add(fb);
+            }
+        }
+
+        for (int round = 0; round < 2; round++) {
+            for (String candidateModel : modelsToTry) {
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + candidateModel + ":generateContent?key=" + geminiApiKey;
+                try {
+                    ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+                    Map<String, Object> body = response.getBody();
+
+                    if (body != null && body.containsKey("candidates")) {
+                        List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
+                        if (!candidates.isEmpty()) {
+                            Map<String, Object> contentResp = (Map<String, Object>) candidates.get(0).get("content");
+                            List<Map<String, Object>> respParts = (List<Map<String, Object>>) contentResp.get("parts");
+                            if (!respParts.isEmpty()) {
+                                String text = (String) respParts.get(0).get("text");
+                                if (text != null && !text.isBlank()) {
+                                    text = text.replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```\\s*$", "").trim();
+                                    return new AiRecommendResponse(text);
+                                }
+                            }
+                        }
                     }
+                } catch (HttpStatusCodeException e) {
+                    int status = e.getStatusCode().value();
+                    log.warn("Gemini 자격증 추천 모델 호출 실패 (model={}, status={}, round={})", candidateModel, status, round + 1);
+                    if (status == 503 || status == 429 || status == 500 || status == 404) {
+                        try {
+                            Thread.sleep(600L);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                        continue;
+                    }
+                    break;
+                } catch (Exception e) {
+                    log.warn("Gemini 자격증 추천 중 예외 발생 (model={}): {}", candidateModel, e.getMessage());
                 }
             }
-            return new AiRecommendResponse("AI 응답을 해석할 수 없습니다.");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new AiRecommendResponse("AI 서버와의 통신 중 오류가 발생했습니다: " + e.getMessage());
         }
+
+        return new AiRecommendResponse("현재 AI 서버 요청량이 많아 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.");
     }
 }

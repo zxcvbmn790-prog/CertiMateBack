@@ -2,19 +2,20 @@ package com.certimate.manager.exam.service;
 
 import com.certimate.manager.exam.dto.AiCoverLetterRequest;
 import com.certimate.manager.exam.dto.AiCoverLetterResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+@Slf4j
 @Service
 public class AiCoverLetterService {
 
@@ -27,18 +28,27 @@ public class AiCoverLetterService {
     @Value("classpath:prompts/cover_letter_prompt.txt")
     private Resource promptResource;
 
+    private static final List<String> FALLBACK_MODELS = List.of(
+            "gemini-3-flash-preview",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
+            "gemini-3.1-flash-lite"
+    );
+
     private final RestTemplate restTemplate;
 
     public AiCoverLetterService() {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000);
+        factory.setReadTimeout(45000);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     public AiCoverLetterResponse generateCoverLetter(AiCoverLetterRequest request) {
         if (geminiApiKey == null || geminiApiKey.isEmpty()) {
             return new AiCoverLetterResponse("AI API 키가 설정되지 않았습니다. 백엔드의 .env 파일을 확인해주세요.");
         }
-
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + geminiModel + ":generateContent?key=" + geminiApiKey;
 
         String basePrompt = "";
         try {
@@ -105,25 +115,60 @@ public class AiCoverLetterService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-        try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            Map<String, Object> body = response.getBody();
-            
-            if (body != null && body.containsKey("candidates")) {
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
-                if (!candidates.isEmpty()) {
-                    Map<String, Object> contentResp = (Map<String, Object>) candidates.get(0).get("content");
-                    List<Map<String, Object>> respParts = (List<Map<String, Object>>) contentResp.get("parts");
-                    if (!respParts.isEmpty()) {
-                        String text = (String) respParts.get(0).get("text");
-                        return new AiCoverLetterResponse(text.trim());
+        List<String> modelsToTry = new ArrayList<>();
+        if (geminiModel != null && !geminiModel.isBlank()) {
+            modelsToTry.add(geminiModel.trim());
+        }
+        for (String fb : FALLBACK_MODELS) {
+            if (!modelsToTry.contains(fb)) {
+                modelsToTry.add(fb);
+            }
+        }
+
+        Exception lastException = null;
+        for (int round = 0; round < 2; round++) {
+            for (String candidateModel : modelsToTry) {
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + candidateModel + ":generateContent?key=" + geminiApiKey;
+                try {
+                    ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+                    Map<String, Object> body = response.getBody();
+
+                    if (body != null && body.containsKey("candidates")) {
+                        List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
+                        if (!candidates.isEmpty()) {
+                            Map<String, Object> contentResp = (Map<String, Object>) candidates.get(0).get("content");
+                            List<Map<String, Object>> respParts = (List<Map<String, Object>>) contentResp.get("parts");
+                            if (!respParts.isEmpty()) {
+                                String text = (String) respParts.get(0).get("text");
+                                if (text != null && !text.isBlank()) {
+                                    return new AiCoverLetterResponse(text.trim());
+                                }
+                            }
+                        }
                     }
+                } catch (HttpStatusCodeException e) {
+                    lastException = e;
+                    int status = e.getStatusCode().value();
+                    log.warn("Gemini 자소서 생성 모델 호출 실패 (model={}, status={}, round={})", candidateModel, status, round + 1);
+                    if (status == 503 || status == 429 || status == 500 || status == 404) {
+                        try {
+                            Thread.sleep(800L);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                        continue;
+                    }
+                    break;
+                } catch (Exception e) {
+                    lastException = e;
+                    log.warn("Gemini 자소서 생성 중 예외 발생 (model={}, round={}): {}", candidateModel, round + 1, e.getMessage());
                 }
             }
-            return new AiCoverLetterResponse("AI 응답을 해석할 수 없습니다.");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new AiCoverLetterResponse("AI 서버와 통신 중 오류가 발생했습니다: " + e.getMessage());
         }
+
+        if (lastException != null) {
+            log.error("모든 Gemini 대체 모델 호출 실패", lastException);
+        }
+        return new AiCoverLetterResponse("현재 AI 서버 요청량이 많아 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
     }
 }

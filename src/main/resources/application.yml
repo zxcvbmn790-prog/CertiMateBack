@@ -33,7 +33,7 @@ google:
 gemini:
   api-key: ${GEMINI_API_KEY:}
   # 무료 티어. 한도가 부족하면 gemini-3.6-flash-lite(RPD 더 넉넉)로 변경 가능.
-  model: ${GEMINI_MODEL:gemini-3.6-flash}
+  model: ${GEMINI_MODEL:gemini-3-flash-preview}
 
 # 공유 DB라 어느 프로필도 스키마를 건드리지 않는다(ddl-auto: validate).
 # 스키마 변경은 SQL로 직접 적용할 것 — update로 되돌리면 대소문자 중복 테이블이 다시 생긴다.

@@ -60,9 +60,9 @@ public class CommunityPostService {
                 }
 
                 String originalFilename = image.getOriginalFilename();
-                String storeFilename = UUID.randomUUID().toString() + "_" + (originalFilename != null ? originalFilename : "image.png");
+                String storeFilename = generateSafeFilename(originalFilename);
                 Path filePath = Paths.get(uploadDir + storeFilename);
-                Files.copy(image.getInputStream(), filePath);
+                Files.copy(image.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
                 imageUrl = "/uploads/" + storeFilename;
             } catch (IOException e) {
@@ -365,9 +365,9 @@ public class CommunityPostService {
                 }
 
                 String originalFilename = newImage.getOriginalFilename();
-                String storeFilename = UUID.randomUUID().toString() + "_" + (originalFilename != null ? originalFilename : "image.png");
+                String storeFilename = generateSafeFilename(originalFilename);
                 Path filePath = Paths.get(uploadDir + storeFilename);
-                Files.copy(newImage.getInputStream(), filePath);
+                Files.copy(newImage.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
                 imageUrl = "/uploads/" + storeFilename;
             } catch (IOException e) {
@@ -424,5 +424,20 @@ public class CommunityPostService {
 
         // 4. 게시글 엔티티 DB 삭제
         communityPostRepository.delete(post);
+    }
+
+    /**
+     * 한글/공백/특수문자로 인한 이미지 깨짐 및 URL 디코딩 오류를 방지하기 위해
+     * 확장자만 안전하게 추출하여 순수 UUID 기반의 안전한 파일명을 생성합니다.
+     */
+    private String generateSafeFilename(String originalFilename) {
+        String ext = ".png";
+        if (originalFilename != null && originalFilename.lastIndexOf('.') != -1) {
+            String rawExt = originalFilename.substring(originalFilename.lastIndexOf('.')).toLowerCase();
+            if (rawExt.matches("\\.(png|jpg|jpeg|gif|webp|bmp)")) {
+                ext = rawExt;
+            }
+        }
+        return UUID.randomUUID().toString() + ext;
     }
 }
