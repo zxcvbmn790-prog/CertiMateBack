@@ -27,6 +27,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
     }
 
+    // 없는 정적 파일(/uploads/없는파일 등)은 서버 오류가 아니라 404다. 아래 Exception 처리에 걸려 500이 되던 것을 막는다.
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("요청한 파일을 찾을 수 없습니다."));
+    }
+
     // 예외 메시지(SQL·클래스명 등)는 응답에 싣지 않고 서버 로그에만 남긴다
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
