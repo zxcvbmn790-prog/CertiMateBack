@@ -11,10 +11,9 @@ public record CertSummaryResponse(
         long totalQuestions,
         long subject1,
         long subject2,
-        long subject3,
-        int examQuestions // 모의고사 한 회의 문항 수(자격증별 출제 구성 기준)
+        long subject3
 ) {
-    public static CertSummaryResponse from(CertSummaryProjection p, int examQuestions) {
+    public static CertSummaryResponse from(CertSummaryProjection p) {
         return new CertSummaryResponse(
                 p.getCertId(),
                 p.getCertName(),
@@ -23,8 +22,7 @@ public record CertSummaryResponse(
                 nz(p.getTotalQuestions()),
                 nz(p.getSubject1()),
                 nz(p.getSubject2()),
-                nz(p.getSubject3()),
-                examQuestions
+                nz(p.getSubject3())
         );
     }
 
