@@ -35,7 +35,8 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public List<CertSummaryResponse> listCertifications() {
         return certificationRepository.findCertificationsWithQuestions().stream()
-                .map(CertSummaryResponse::from)
+                .map(p -> CertSummaryResponse.from(p, java.util.Arrays.stream(
+                        SUBJECT_QUESTION_COUNTS.getOrDefault(p.getCertName(), DEFAULT_SUBJECT_QUESTION_COUNTS)).sum()))
                 .collect(java.util.stream.Collectors.toList());
     }
 
