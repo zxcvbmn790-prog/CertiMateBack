@@ -98,4 +98,22 @@ class JobRecommendationGuardTest {
 
         saramin.verify();
     }
+
+    @Test
+    void junkKeywordIsNormalizedToKnownCertName() {
+        UserRepository users = mock(UserRepository.class);
+        when(users.findByEmail(anyString())).thenReturn(Optional.empty());
+        JobMatchingService service = newService(users);
+        RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(service, "restTemplate");
+        MockRestServiceServer saramin = MockRestServiceServer.bindTo(restTemplate).build();
+        // 사람인에는 입력한 아무 말이 아니라 정식 자격증 이름으로 검색해야 한다
+        saramin.expect(once(), requestTo(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("%E3%85%8B"))))
+                .andRespond(withSuccess(HTML, MediaType.TEXT_HTML));
+
+        JobMatchingResponse res = service.getJobRecommendations("u@test.com", "정보처리기사ㅋㅋㅋ", "전체", 1);
+
+        assertThat(res.getActiveKeyword()).isEqualTo("정보처리기사");
+        assertThat(res.getPostings()).extracting("matchedCert").containsOnly("정보처리기사");
+        saramin.verify();
+    }
 }

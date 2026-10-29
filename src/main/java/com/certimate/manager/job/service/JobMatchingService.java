@@ -132,10 +132,12 @@ public class JobMatchingService {
         String baseCertKeyword;
         if (keyword != null && !keyword.isBlank() && !"AUTO".equalsIgnoreCase(keyword)) {
             String trimmed = keyword.trim();
-            boolean isValid = myCertifications.stream().anyMatch(c -> c.equalsIgnoreCase(trimmed) || c.contains(trimmed) || trimmed.contains(c))
-                    || KNOWN_CERTS.stream().anyMatch(c -> c.equalsIgnoreCase(trimmed) || c.contains(trimmed) || trimmed.contains(c));
-            if (isValid) {
-                baseCertKeyword = trimmed;
+            // 입력값을 그대로 쓰지 않고 일치한 자격증의 정식 이름을 쓴다("정보처리기사ㅋㅋ" → "정보처리기사").
+            Optional<String> matched = java.util.stream.Stream.concat(myCertifications.stream(), KNOWN_CERTS.stream())
+                    .filter(c -> c.equalsIgnoreCase(trimmed) || c.contains(trimmed) || trimmed.contains(c))
+                    .findFirst();
+            if (matched.isPresent()) {
+                baseCertKeyword = matched.get();
             } else if (!myCertifications.isEmpty()) {
                 baseCertKeyword = myCertifications.get(0);
             } else {

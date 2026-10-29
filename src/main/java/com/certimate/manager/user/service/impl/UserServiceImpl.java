@@ -230,16 +230,11 @@ public class UserServiceImpl implements UserService {
                     .orElseThrow(() -> new CustomException(HttpStatus.NOT_FOUND, "자격증을 찾을 수 없습니다."));
         }
         if (certName != null && !certName.isBlank()) {
+            // 입력한 이름으로 새 자격증을 만들지 않는다. 공용 자격증 목록이 임의의 문자열로 오염되기 때문이다.
             String trimmed = certName.trim();
             return certificationRepository.findByCertName(trimmed)
-                    .orElseGet(() -> certificationRepository.save(
-                            com.certimate.manager.user.entity.Certification.builder()
-                                    .certName(trimmed)
-                                    .difficulty("국가기술/전문")
-                                    .agency("공인기관")
-                                    .views(0)
-                                    .build()
-                    ));
+                    .orElseThrow(() -> new CustomException(HttpStatus.BAD_REQUEST,
+                            "목록에 없는 자격증입니다. 자격증 목록에서 선택해 주세요."));
         }
         throw new CustomException(HttpStatus.BAD_REQUEST, "자격증을 선택하거나 입력해주세요.");
     }
