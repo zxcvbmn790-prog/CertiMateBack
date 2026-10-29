@@ -18,8 +18,11 @@ import org.springframework.web.client.RestTemplate;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +35,19 @@ public class JobMatchingService {
     private final UserCertificationRepository userCertificationRepository;
     private final ExamScheduleRepository examScheduleRepository;
     private final RestTemplate restTemplate = new RestTemplate();
+
+    // 같은 검색어·페이지는 30분간 사람인을 다시 조회하지 않는다 (차단·부하 방지).
+    // ponytail: 단일 인스턴스 인메모리 캐시. 키 종류가 많아지면 크기 제한 있는 캐시(Caffeine)로 바꿀 것.
+    private static final Duration CACHE_TTL = Duration.ofMinutes(30);
+    private static final int MAX_PAGE = 5;
+    private static final int MAX_CACHE_ENTRIES = 500;
+    private final Map<String, CachedPostings> postingsCache = new ConcurrentHashMap<>();
+
+    private record CachedPostings(List<JobPostingDto> postings, Instant fetchedAt) {
+        boolean isFresh() {
+            return fetchedAt.isAfter(Instant.now().minus(CACHE_TTL));
+        }
+    }
 
     private static final List<String> KNOWN_CERTS = List.of(
             "정보처리기사", "정보처리산업기사", "SQLD", "ADsP", "리눅스마스터",
@@ -139,7 +155,7 @@ public class JobMatchingService {
         boolean isMyCert = myCertifications.stream()
                 .anyMatch(c -> c.contains(baseCertKeyword) || baseCertKeyword.contains(c));
 
-        List<JobPostingDto> postings = fetchSaraminPostings(searchQuery, baseCertKeyword, isMyCert, Math.max(1, page));
+        List<JobPostingDto> postings = cachedSaraminPostings(searchQuery, baseCertKeyword, isMyCert, Math.min(Math.max(1, page), MAX_PAGE));
 
         return JobMatchingResponse.builder()
                 .userName(userName)
@@ -151,6 +167,27 @@ public class JobMatchingService {
                 .activeKeyword(baseCertKeyword)
                 .postings(postings)
                 .build();
+    }
+
+    private List<JobPostingDto> cachedSaraminPostings(String searchQuery, String certBadgeName, boolean isMyCert, int page) {
+        // isMyCert는 점수 계산에 쓰이므로 키에 포함한다.
+        String key = searchQuery + "|" + certBadgeName + "|" + isMyCert + "|" + page;
+        CachedPostings hit = postingsCache.get(key);
+        if (hit != null && hit.isFresh()) {
+            return hit.postings();
+        }
+        List<JobPostingDto> postings = fetchSaraminPostings(searchQuery, certBadgeName, isMyCert, page);
+        // 실패·차단 시 빈 목록이 오므로 빈 결과는 저장하지 않는다 (다음 요청에서 다시 시도).
+        if (!postings.isEmpty()) {
+            if (postingsCache.size() >= MAX_CACHE_ENTRIES) {
+                postingsCache.entrySet().removeIf(e -> !e.getValue().isFresh());
+                if (postingsCache.size() >= MAX_CACHE_ENTRIES) {
+                    postingsCache.clear();
+                }
+            }
+            postingsCache.put(key, new CachedPostings(List.copyOf(postings), Instant.now()));
+        }
+        return postings;
     }
 
     private List<JobPostingDto> fetchSaraminPostings(String searchQuery, String certBadgeName, boolean isMyCert, int page) {
