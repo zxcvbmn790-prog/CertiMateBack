@@ -39,21 +39,27 @@ public class ExamServiceImpl implements ExamService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    // 실제 필기시험의 과목별 문항 수. 등록되지 않은 자격증은 1~3과목 × 20문제로 출제한다.
+    // ponytail: 자격증명으로 찾는 정적 표. 종목이 늘어 관리가 번거로워지면 certification 테이블 컬럼으로 옮길 것.
+    private static final java.util.Map<String, int[]> SUBJECT_QUESTION_COUNTS = java.util.Map.of(
+            "정보처리기사", new int[]{20, 20, 20, 20, 20},
+            "정보처리산업기사", new int[]{20, 20, 20},
+            "SQL 개발자 (SQLD)", new int[]{10, 40},
+            "데이터분석준전문가 (ADsP)", new int[]{10, 10, 30}
+    );
+    private static final int[] DEFAULT_SUBJECT_QUESTION_COUNTS = {20, 20, 20};
+
     @Override
     public List<AiLearnResponse> generateMockExam(Long certId) {
+        String certName = certificationRepository.findById(certId).map(c -> c.getCertName()).orElse("");
+        int[] counts = SUBJECT_QUESTION_COUNTS.getOrDefault(certName, DEFAULT_SUBJECT_QUESTION_COUNTS);
+
         List<AiLearn> mockExam = new ArrayList<>();
-
-        // 1과목, 2과목, 3과목 순서대로 반복
-        for (int subjectNum = 1; subjectNum <= 3; subjectNum++) {
-            // 1. 해당 자격증(certId)과 과목(subjectNum)의 전체 문제 가져오기
+        // 과목 순서대로, 과목마다 문제은행에서 무작위로 정해진 수만큼 뽑는다.
+        for (int subjectNum = 1; subjectNum <= counts.length; subjectNum++) {
             List<AiLearn> allQuestions = new ArrayList<>(aiLearnRepository.findByCertIdAndSubjectNum(certId, subjectNum));
-
-            // 2. 전체 문제를 무작위로 섞기
             Collections.shuffle(allQuestions);
-
-            // 3. 앞에서부터 딱 20개만 잘라서 모의고사 리스트에 추가
-            int limit = Math.min(allQuestions.size(), 20);
-            mockExam.addAll(allQuestions.subList(0, limit));
+            mockExam.addAll(allQuestions.subList(0, Math.min(allQuestions.size(), counts[subjectNum - 1])));
         }
 
         return mockExam.stream().map(AiLearnResponse::from).collect(Collectors.toList());
