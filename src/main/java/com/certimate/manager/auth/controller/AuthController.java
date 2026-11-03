@@ -23,6 +23,7 @@ import java.security.Principal;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.certimate.manager.security.JwtProvider jwtProvider;
 
     @PostMapping("/register")
     public ApiResponse<String> register(@RequestBody RegisterRequest request) {
@@ -91,15 +92,7 @@ public class AuthController {
         }
     }
 
-    // 중복되는 쿠키 굽기 로직을 메서드로 분리
     private void setCookie(HttpServletResponse response, String token) {
-        ResponseCookie cookie = ResponseCookie.from("accessToken", token)
-                .httpOnly(true)
-                .secure(false) // 로컬 테스트용. 나중에 HTTPS 배포 시 true로 변경!
-                .path("/")
-                .maxAge(60 * 60) // 1시간 유지
-                .sameSite("Lax")
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, jwtProvider.buildCookie(token).toString());
     }
 }

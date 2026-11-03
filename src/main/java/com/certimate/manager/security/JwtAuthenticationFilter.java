@@ -22,12 +22,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String token = null;
+        boolean fromCookie = false;
 
         // 1. 브라우저가 보낸 쿠키함에서 'accessToken'을 찾습니다.
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("accessToken".equals(cookie.getName())) {
                     token = cookie.getValue();
+                    fromCookie = true;
                     break;
                 }
             }
@@ -47,6 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
             SecurityContextHolder.getContext().setAuthentication(auth);
+
+            // 사용 중이면 로그인 기간을 다시 늘려 준다(쿠키 로그인에만 해당)
+            if (fromCookie && jwtProvider.shouldRenew(token)) {
+                response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE,
+                        jwtProvider.buildCookie(jwtProvider.generateToken(email)).toString());
+            }
         }
 
         filterChain.doFilter(request, response);
